@@ -75,7 +75,7 @@ func Compress(srcPath string, dstPath string) (err error) {
 		}
 		return err
 	})
-	fmt.Println("")
+	fmt.Printf("\rProcessing files: %d          \n", filesCount)
 
 	completed := false
 	go func() {

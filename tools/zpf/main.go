@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"tools/zpf/zpflib"
+	"github.com/aosorgin/gotools/tools/zpf/zpflib"
 	"runtime"
 )
 
