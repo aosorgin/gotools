@@ -43,7 +43,13 @@ type CryptoGenerator struct {
 	completed sync.WaitGroup
 }
 
-func (gen *CryptoGenerator) Init() {
+type Generator interface {
+	Init() error
+	Stop() error
+	Read(p []byte) (int, error) // From io.Reader
+}
+
+func (gen *CryptoGenerator) Init() error {
 	cpuCount := runtime.NumCPU()
 	gen.data = make(chan []byte, cpuCount*2)
 	gen.block = nil
@@ -52,11 +58,13 @@ func (gen *CryptoGenerator) Init() {
 		gen.completed.Add(1)
 		go generateRoutine(gen.data, &gen.complete, &gen.completed)
 	}
+	return nil
 }
 
-func (gen *CryptoGenerator) Stop() {
+func (gen *CryptoGenerator) Stop() error {
 	gen.complete = true
 	gen.completed.Wait()
+	return nil
 }
 
 func (gen *CryptoGenerator) Read(p []byte) (int, error) {

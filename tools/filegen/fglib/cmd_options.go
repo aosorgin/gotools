@@ -22,7 +22,7 @@ type CmdOptions struct {
 	Command  int    // CommandEnum
 	Path     string // Root path got processing files
 	Generate struct {
-		//Folders  []uint32 // Folders tree count. For example [3,4] - 3 folders in root, 4 folders in previous, etc.
+		Folders  uint   // Folders tree count. For example [3,4] - 3 folders in root, 4 folders in previous, etc.
 		Files    uint   // Files count in each tree level
 		FileSize uint64 // File size for each tree level
 	}
@@ -50,6 +50,12 @@ func processGenerateCommand() {
 		os.Exit(1)
 	}
 
+	if Options.Generate.Folders == 0 {
+		fmt.Fprintf(os.Stderr, "Error: Use the --folders option to set files count to generate.\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	if Options.Generate.Files == 0 {
 		fmt.Fprintf(os.Stderr, "Error: Use the --files option to set files count to generate.\n")
 		flag.Usage()
@@ -72,6 +78,7 @@ func ParseCmdOptions() {
 	/* Initializing flags for parsing command-line arguments */
 
 	flag.UintVar(&Options.Generate.Files, "files", 0, "Number of files to generate")
+	flag.UintVar(&Options.Generate.Folders, "folders", 1, "Number of folders to generate")
 	flag.Uint64Var(&Options.Generate.FileSize, "size", 0, "Size of files to generate")
 
 	flag.StringVar(&Options.Path, "path", "", "Path to root folder to generate files")
