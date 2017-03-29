@@ -11,10 +11,15 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
+	//"runtime"
 	"sync"
 	"time"
 )
+
+type DataGenerator interface {
+	Seed(key []byte) error
+	Read(p []byte) (int, error)
+}
 
 type Generator struct {
 	generator io.Reader
@@ -60,7 +65,12 @@ func (gen *Generator) Init() error {
 		return fmt.Errorf("Generator is not set")
 	}
 
-	cpuCount := runtime.NumCPU()
+	// TODO: Use multimpe goroutines to generate pseudo random data (see PseudoRandomGenerator)
+	// Issues:
+	//   -- Block from different goroulines must be ordered with goroutine index to order the data flow
+	//   -- Make its own encrypting block instance per goroutine. Could give DataGenerator factory instead it own
+
+	cpuCount := /*runtime.NumCPU()*/ 1
 	gen.data = make(chan []byte, cpuCount*2)
 	gen.block = nil
 	gen.complete = false

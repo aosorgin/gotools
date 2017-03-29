@@ -18,7 +18,15 @@ func main() {
 
 	var writer fglib.DataWriter
 	var gen fglib.Generator
-	gen.SetDataGenerator(new(fglib.CryptoGenerator))
+	if fglib.Options.GeneratorType == fglib.GeneratorCrypto {
+		gen.SetDataGenerator(new(fglib.CryptoGenerator))
+	} else if fglib.Options.GeneratorType == fglib.GeneratorPseudo {
+		var dataGen fglib.PseudoRandomGenerator
+		dataGen.Seed(fglib.Options.Seed)
+		gen.SetDataGenerator(&dataGen)
+	} else {
+		panic("Invalid generator type")
+	}
 	err := writer.Init(&gen)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: Failed to initialize generator with error", err)
