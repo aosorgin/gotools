@@ -8,78 +8,94 @@ Brief:     Cryptographically secure pseudorandom data generator
 package fglib
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
-	"runtime"
-	"sync"
-	"time"
+	"encoding/binary"
+	"fmt"
+	"io"
 )
 
-func generateRoutine(data chan []byte, complete *bool, completed *sync.WaitGroup) {
-	defer completed.Done()
-	blockSize := 1024 * 1024
-	block := make([]byte, blockSize)
+/* Seed tools */
 
-	for {
-		rand.Read(block)
-		for {
-			if *complete == true {
-				return
-			}
-
-			select {
-			case data <- block:
-				break // Go to generate of new block
-			case <-time.After(time.Second):
-				// Check if coplete flag is set
-			}
-		}
-	}
+func SeedFromUint64(s uint64) []byte {
+	seed := make([]byte, 16)
+	binary.PutUvarint(seed, s)
+	return seed
 }
 
-type CryptoGenerator struct {
-	data      chan []byte
-	block     []byte
-	complete  bool
-	completed sync.WaitGroup
+/* Crypto data generator implementation */
+
+type cryptoGeneratorReader struct {
 }
 
-func (gen *CryptoGenerator) Init() {
-	cpuCount := runtime.NumCPU()
-	gen.data = make(chan []byte, cpuCount*2)
-	gen.block = nil
-	gen.complete = false
-	for i := 0; i < cpuCount; i++ {
-		gen.completed.Add(1)
-		go generateRoutine(gen.data, &gen.complete, &gen.completed)
-	}
+func (gen *cryptoGeneratorReader) Read(block []byte) (int, error) {
+	return rand.Read(block)
 }
 
-func (gen *CryptoGenerator) Stop() {
-	gen.complete = true
-	gen.completed.Wait()
+type CryptoGenerator struct { // inherits DataGenerator
 }
 
-func (gen *CryptoGenerator) Read(p []byte) (int, error) {
-	offset := 0
-	size := len(p)
-	for size > 0 {
-		if gen.block == nil {
-			gen.block = <-gen.data
-		}
+func (gen *CryptoGenerator) Seed(key []byte) error {
+	return fmt.Errorf("Seed is not supported for crypto random generator")
+}
 
-		blockSize := len(gen.block)
-		if blockSize <= size {
-			copy(p[offset:], gen.block)
-			offset += blockSize
-			size -= blockSize
-			gen.block = nil
-			continue
-		}
+func (gen *CryptoGenerator) GetReader() (io.Reader, error) {
+	return new(cryptoGeneratorReader), nil
+}
 
-		copy(p[offset:], gen.block[:size])
-		gen.block = gen.block[size:]
-		break
+/* Pseudo random data generator implementation */
+
+type pseudoRandomDataReader struct {
+	block   []byte
+	encrypt cipher.Block
+	index   int
+}
+
+func (gen *pseudoRandomDataReader) Read(block []byte) (int, error) {
+	bitSize := len(gen.block)
+	bitsCount := len(block) / bitSize
+	if len(block)%bitSize > 0 {
+		bitsCount++
 	}
 
-	return size, nil
+	/* increment one ob bytes of encrypted block */
+	encrypted := make([]byte, len(gen.block))
+	for i := 0; i < bitsCount; i++ {
+		gen.block[gen.index] += 1
+		gen.index += 1
+		if gen.index == bitSize {
+			gen.index = 0
+		}
+
+		gen.encrypt.Decrypt(encrypted, gen.block)
+		copy(block[bitSize*i:], encrypted)
+	}
+	return len(block), nil
+}
+
+type PseudoRandomGenerator struct {
+	seed []byte
+}
+
+func (gen *PseudoRandomGenerator) Seed(key []byte) error {
+	if len(key) != 16 {
+		return fmt.Errorf("Seed must have 16 bytes length. Got: %d", len(key))
+	}
+
+	gen.seed = key
+	return nil
+}
+
+func (gen *PseudoRandomGenerator) GetReader() (io.Reader, error) {
+	reader := new(pseudoRandomDataReader)
+	var err error
+	reader.encrypt, err = aes.NewCipher(gen.seed)
+	if err != nil {
+		return nil, err
+	}
+	reader.block = make([]byte, len(gen.seed))
+	copy(reader.block, gen.seed)
+	gen.seed[0]++
+	return reader, nil
 }

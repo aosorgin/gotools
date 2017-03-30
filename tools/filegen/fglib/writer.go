@@ -7,7 +7,6 @@ Brief:     Files writer for random generator
 
 package fglib
 
-import ()
 import (
 	"bufio"
 	"fmt"
@@ -16,7 +15,7 @@ import (
 	"time"
 )
 
-func writeFile(path string, size uint64, gen *CryptoGenerator) {
+func writeFile(path string, size uint64, gen *Generator) {
 	rawFile, err := os.Create(path)
 	if err != nil {
 		return
@@ -42,30 +41,45 @@ func writeFile(path string, size uint64, gen *CryptoGenerator) {
 	}
 }
 
-func WriteFiles(gen *CryptoGenerator) {
+type DataWriter struct {
+	gen *Generator
+}
+
+func (w *DataWriter) Init(gen *Generator) error {
+	w.gen = gen
+	return w.gen.Init()
+}
+
+func (w *DataWriter) Close() error {
+	return w.gen.Stop()
+}
+
+func (w *DataWriter) WriteFiles() error {
 	completeSignal := make(chan bool)
 	filesGenerated := 0
 
-	gen.Init()
-
 	go func() {
-		var i uint = 0
-		for ; i < Options.Generate.Files; i++ {
-			writeFile(filepath.Join(Options.Path, fmt.Sprintf("file%d", i)), Options.Generate.FileSize, gen)
-			filesGenerated += 1
+		for i := uint(0); i < Options.Generate.Folders; i++ {
+			folderPath := filepath.Join(Options.Path, fmt.Sprintf("dir%04d", i))
+			os.MkdirAll(folderPath, os.ModeDir)
+			for j := uint(0); j < Options.Generate.Files; j++ {
+				writeFile(filepath.Join(folderPath, fmt.Sprintf("file%04d", j)), Options.Generate.FileSize, w.gen)
+				filesGenerated += 1
+			}
 		}
 		completeSignal <- true
 	}()
 
 	timeout := time.Tick(time.Second)
+	filesTotal := Options.Generate.Folders * Options.Generate.Files
 	for {
 		select {
 		case <-timeout:
-			fmt.Printf("\rGenerated: (%d/%d)        ", filesGenerated, Options.Generate.Files)
+			fmt.Printf("\rGenerated: (%d/%d)        ", filesGenerated, filesTotal)
 		case <-completeSignal:
-			fmt.Printf("\rGenerated: (%d/%d)        ", filesGenerated, Options.Generate.Files)
-			gen.Stop()
-			return
+			fmt.Printf("\rGenerated: (%d/%d)        ", filesGenerated, filesTotal)
+			return nil
 		}
 	}
+	return nil
 }
