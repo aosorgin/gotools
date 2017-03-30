@@ -8,11 +8,12 @@ Brief:     Cryptographically secure pseudorandom data generator
 package fglib
 
 import (
-	"crypto/rand"
-	"crypto/cipher"
-	"fmt"
 	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"encoding/binary"
+	"fmt"
+	"io"
 )
 
 /* Seed tools */
@@ -25,6 +26,13 @@ func SeedFromUint64(s uint64) []byte {
 
 /* Crypto data generator implementation */
 
+type cryptoGeneratorReader struct {
+}
+
+func (gen *cryptoGeneratorReader) Read(block []byte) (int, error) {
+	return rand.Read(block)
+}
+
 type CryptoGenerator struct { // inherits DataGenerator
 }
 
@@ -32,53 +40,24 @@ func (gen *CryptoGenerator) Seed(key []byte) error {
 	return fmt.Errorf("Seed is not supported for crypto random generator")
 }
 
-func (gen *CryptoGenerator) Read(block []byte) (int, error) {
-	return rand.Read(block)
+func (gen *CryptoGenerator) GetReader() (io.Reader, error) {
+	return new(cryptoGeneratorReader), nil
 }
 
+/* Pseudo random data generator implementation */
 
-type PseudoRandomGenerator struct {
-	block []byte
+type pseudoRandomDataReader struct {
+	block   []byte
 	encrypt cipher.Block
-	index int
+	index   int
 }
 
-func (gen *PseudoRandomGenerator) Seed(key []byte) error {
-	if len(key) != 16 {
-		return fmt.Errorf("Seed must have 16 bytes length. Got: %d", len(key))
-	}
-
-	var err error
-	gen.encrypt, err = aes.NewCipher(key)
-	if err != nil {
-		return err
-	}
-	gen.block = make([]byte, len(key))
-	copy(gen.block, key)
-	return nil
-}
-
-func prepareBlock(bit *[]byte, index *int, size int) []byte {
-	bitSize := len(*bit)
-	bitsCount := size / bitSize
-
-	block := make([]byte, bitSize * bitsCount)
-
-	/* increment one ob bytes of encrypted block */
-	for i := 0; i < bitsCount; i++ {
-		(*bit)[*index] += 1
-		*index += 1
-		if *index == bitSize {
-			*index = 0
-		}
-		copy(block[bitSize * i:], *bit)
-	}
-	return block
-}
-
-func (gen *PseudoRandomGenerator) Read(block []byte) (int, error) {
+func (gen *pseudoRandomDataReader) Read(block []byte) (int, error) {
 	bitSize := len(gen.block)
-	bitsCount := (len(block) / bitSize + 1)
+	bitsCount := len(block) / bitSize
+	if len(block)%bitSize > 0 {
+		bitsCount++
+	}
 
 	/* increment one ob bytes of encrypted block */
 	encrypted := make([]byte, len(gen.block))
@@ -90,8 +69,33 @@ func (gen *PseudoRandomGenerator) Read(block []byte) (int, error) {
 		}
 
 		gen.encrypt.Decrypt(encrypted, gen.block)
-		copy(block[bitSize * i:], encrypted)
+		copy(block[bitSize*i:], encrypted)
 	}
 	return len(block), nil
 }
 
+type PseudoRandomGenerator struct {
+	seed []byte
+}
+
+func (gen *PseudoRandomGenerator) Seed(key []byte) error {
+	if len(key) != 16 {
+		return fmt.Errorf("Seed must have 16 bytes length. Got: %d", len(key))
+	}
+
+	gen.seed = key
+	return nil
+}
+
+func (gen *PseudoRandomGenerator) GetReader() (io.Reader, error) {
+	reader := new(pseudoRandomDataReader)
+	var err error
+	reader.encrypt, err = aes.NewCipher(gen.seed)
+	if err != nil {
+		return nil, err
+	}
+	reader.block = make([]byte, len(gen.seed))
+	copy(reader.block, gen.seed)
+	gen.seed[0]++
+	return reader, nil
+}

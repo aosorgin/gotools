@@ -11,29 +11,95 @@ import (
 	"fmt"
 	"io"
 	"os"
-	//"runtime"
+	"runtime"
 	"sync"
 	"time"
 )
 
 type DataGenerator interface {
 	Seed(key []byte) error
-	Read(p []byte) (int, error)
+	GetReader() (io.Reader, error)
 }
 
+/* Queues implementations */
+
+type DataQueue interface {
+	SetChanel(dest chan []byte, maxIndex int)
+	Process(index int, data []byte)
+}
+
+/* Unordered queue implementation */
+
+type UnorderedQueue struct {
+	dest chan []byte
+}
+
+func (q *UnorderedQueue) SetChanel(dest chan []byte, maxIndex int) {
+	q.dest = dest
+}
+
+func (q *UnorderedQueue) Process(index int, data []byte) {
+	q.dest <- data
+}
+
+/* Ordered queue implementation */
+
+type OrderedQueue struct {
+	dest      chan []byte
+	buffer    map[int][]byte
+	guard     sync.Mutex
+	nextIndex int
+	maxIndex  int
+}
+
+func (q *OrderedQueue) SetChanel(dest chan []byte, maxIndex int) {
+	q.dest = dest
+	q.buffer = make(map[int][]byte)
+	q.nextIndex = 0
+	q.maxIndex = maxIndex
+}
+
+func (q *OrderedQueue) Process(index int, data []byte) {
+	q.guard.Lock()
+	defer q.guard.Unlock()
+	if index != q.nextIndex {
+		q.buffer[index] = data
+		return
+	}
+
+	q.dest <- data
+	nextIndex := func() {
+		q.nextIndex = (q.nextIndex + 1) % q.maxIndex
+	}
+	nextIndex()
+	for {
+		var ok bool
+		data, ok = q.buffer[q.nextIndex]
+		if ok == false {
+			return
+		}
+		q.dest <- data
+		delete(q.buffer, q.nextIndex)
+		nextIndex()
+	}
+}
+
+/* Data generator implementation */
+
 type Generator struct {
-	generator io.Reader
+	generator DataGenerator
 	data      chan []byte
+	queue     DataQueue
 	block     []byte
 	complete  bool
 	completed sync.WaitGroup
 }
 
-func generateRoutine(data chan []byte, generator io.Reader, complete *bool, completed *sync.WaitGroup) {
+func generateRoutine(queue DataQueue, generator io.Reader, index int, complete *bool, completed *sync.WaitGroup) {
 	defer completed.Done()
 	blockSize := 1024 * 1024
 	block := make([]byte, blockSize)
-
+	processCompleted := make(chan bool)
 	for {
 		read, err := generator.Read(block)
 		if err != nil {
@@ -41,23 +107,36 @@ func generateRoutine(data chan []byte, generator io.Reader, complete *bool, comp
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
+
+		go func() {
+			queue.Process(index, block[:read])
+			processCompleted <- true
+		}()
+
+		processed := false
 		for {
 			if *complete == true {
 				return
 			}
 
+			if processed == true {
+				break
+			}
+
 			select {
-			case data <- block[:read]:
+			case <-processCompleted:
+				processed = true
 				break // Go to generate of new block
 			case <-time.After(time.Second):
-				// Check if coplete flag is set
+				// Check if complete flag is set
 			}
 		}
 	}
 }
 
-func (gen *Generator) SetDataGenerator(generator io.Reader) {
+func (gen *Generator) SetDataGenerator(generator DataGenerator, queue DataQueue) {
 	gen.generator = generator
+	gen.queue = queue
 }
 
 func (gen *Generator) Init() error {
@@ -65,18 +144,20 @@ func (gen *Generator) Init() error {
 		return fmt.Errorf("Generator is not set")
 	}
 
-	// TODO: Use multimpe goroutines to generate pseudo random data (see PseudoRandomGenerator)
-	// Issues:
-	//   -- Block from different goroulines must be ordered with goroutine index to order the data flow
-	//   -- Make its own encrypting block instance per goroutine. Could give DataGenerator factory instead it own
-
-	cpuCount := /*runtime.NumCPU()*/ 1
+	cpuCount := runtime.NumCPU()
 	gen.data = make(chan []byte, cpuCount*2)
+	gen.queue.SetChanel(gen.data, cpuCount)
 	gen.block = nil
 	gen.complete = false
+
+	/* start generating goroutines */
 	for i := 0; i < cpuCount; i++ {
+		reader, err := gen.generator.GetReader()
+		if err != nil {
+			return err
+		}
 		gen.completed.Add(1)
-		go generateRoutine(gen.data, gen.generator, &gen.complete, &gen.completed)
+		go generateRoutine(gen.queue, reader, i, &gen.complete, &gen.completed)
 	}
 	return nil
 }
