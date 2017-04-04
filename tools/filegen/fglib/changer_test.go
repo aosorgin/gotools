@@ -1,11 +1,11 @@
-package fglib
-
 /*
 Author:    Alexey Osorgin (alexey.osorgin@gmail.com)
 Copyright: Alexey Osorgin, 2017
 
 Brief:     Tests for intervals parsing
 */
+
+package fglib
 
 import (
 	"fmt"
@@ -56,7 +56,7 @@ func TestFailOnNegativeInterval(t *testing.T) {
 }
 
 func TestParseNotObsoleteInterval(t *testing.T) {
-	i, err := ParseInterval("23%,10%,17%")
+	i, err := ParseInterval("23%%,10%%,17%%")
 	if err != nil {
 		t.Error(err)
 	}
@@ -66,24 +66,24 @@ func TestParseNotObsoleteInterval(t *testing.T) {
 }
 
 func TestFailToParseNotObsoleteIntervalWithInvalidValues(t *testing.T) {
-	_, err := ParseInterval("8953%,80%,3%")
+	_, err := ParseInterval("8953%%,80%%,3%%")
 	if err == nil {
 		t.Error(fmt.Errorf("Successfully parse more then 100%% interval"))
 	}
 
-	_, err = ParseInterval("89%,840%,3%")
+	_, err = ParseInterval("89%%,840%%,3%%")
 	if err == nil {
 		t.Error(fmt.Errorf("Successfully parse more then 100%% interval"))
 	}
 
-	_, err = ParseInterval("89%,40%,378%")
+	_, err = ParseInterval("89%%,40%%,378%%")
 	if err == nil {
 		t.Error(fmt.Errorf("Successfully parse more then 100%% interval"))
 	}
 }
 
 func TestParseCombineInterval(t *testing.T) {
-	i, err := ParseInterval("23K,96%,17k")
+	i, err := ParseInterval("23K,96%%,17k")
 	if err != nil {
 		t.Error(err)
 	}
@@ -91,7 +91,7 @@ func TestParseCombineInterval(t *testing.T) {
 	checkIntervalValue(t, "modify", i.modify, 96, false)
 	checkIntervalValue(t, "notModifyUntil", i.notModifyUntil, 17*1000, true)
 
-	i, err = ParseInterval("23%,96m,17M")
+	i, err = ParseInterval("23%%,96m,17M")
 	if err != nil {
 		t.Error(err)
 	}
@@ -99,7 +99,7 @@ func TestParseCombineInterval(t *testing.T) {
 	checkIntervalValue(t, "modify", i.modify, 96*1000*1000, true)
 	checkIntervalValue(t, "notModifyUntil", i.notModifyUntil, 17*1024*1024, true)
 
-	i, err = ParseInterval("23g,96G,17%")
+	i, err = ParseInterval("23g,96G,17%%")
 	if err != nil {
 		t.Error(err)
 	}

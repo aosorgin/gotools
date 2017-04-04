@@ -173,34 +173,50 @@ func changeFile(path string, info os.FileInfo, c *Changer) error {
 	}
 	defer file.Close()
 
-	// TODO: Support reverse changing
-
 	size := info.Size()
-	for size > 0 {
+	write_size := int64(0)
+	offset, new_offset := int64(0), int64(0)
+	for offset < size {
 		if i.notModify.value > 0 {
-			if size < i.notModify.value {
+			if (size - new_offset) < i.notModify.value {
 				break
 			}
-			file.Seek(i.notModify.value, io.SeekCurrent)
-			size -= i.notModify.value
+			new_offset += i.notModify.value
 		}
 
-		writen, err := io.CopyN(file, c.gen, min(i.modify.value, size))
-		size -= writen
+		if c.reverse == true || new_offset != offset {
+			if c.reverse == true {
+				if (size - new_offset) < i.modify.value {
+					file.Seek(0, io.SeekStart)
+				} else {
+					file.Seek(size - new_offset - i.modify.value, io.SeekStart)
+				}
+				write_size = min(size - new_offset, i.modify.value)
+			} else {
+				file.Seek(new_offset, io.SeekStart)
+				write_size = min(i.modify.value, size - new_offset)
+			}
+			offset = new_offset
+		} else {
+			write_size = min(i.modify.value, size - new_offset)
+		}
+
+		writen, err := io.CopyN(file, c.gen, write_size)
+		new_offset += writen
+		offset = new_offset
 		if err != nil {
 			return err
 		}
 
-		if i.notModifyUntil.value > 0 {
-			if size < i.notModifyUntil.value {
-				break
-			}
-			file.Seek(i.notModifyUntil.value, io.SeekCurrent)
-			size -= i.notModifyUntil.value
-		}
-
 		if c.once == true {
 			break
+		}
+
+		if i.notModifyUntil.value > 0 {
+			if (size - new_offset) < i.notModifyUntil.value {
+				break
+			}
+			new_offset += i.notModifyUntil.value
 		}
 	}
 	return nil
