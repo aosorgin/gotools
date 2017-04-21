@@ -91,11 +91,11 @@ type Generator struct {
 	data      chan []byte
 	queue     DataQueue
 	block     []byte
-	complete  bool
+	stopping  bool
 	completed sync.WaitGroup
 }
 
-func generateRoutine(queue DataQueue, generator io.Reader, index int, complete *bool, completed *sync.WaitGroup) {
+func generateRoutine(queue DataQueue, generator io.Reader, index int, stopping *bool, completed *sync.WaitGroup) {
 	defer completed.Done()
 	blockSize := 1024 * 1024
 	block := make([]byte, blockSize)
@@ -115,7 +115,7 @@ func generateRoutine(queue DataQueue, generator io.Reader, index int, complete *
 
 		processed := false
 		for {
-			if *complete == true {
+			if *stopping == true {
 				return
 			}
 
@@ -148,7 +148,7 @@ func (gen *Generator) Init() error {
 	gen.data = make(chan []byte, cpuCount*2)
 	gen.queue.SetChanel(gen.data, cpuCount)
 	gen.block = nil
-	gen.complete = false
+	gen.stopping = false
 
 	/* start generating goroutines */
 	for i := 0; i < cpuCount; i++ {
@@ -157,13 +157,13 @@ func (gen *Generator) Init() error {
 			return err
 		}
 		gen.completed.Add(1)
-		go generateRoutine(gen.queue, reader, i, &gen.complete, &gen.completed)
+		go generateRoutine(gen.queue, reader, i, &gen.stopping, &gen.completed)
 	}
 	return nil
 }
 
 func (gen *Generator) Stop() error {
-	gen.complete = true
+	gen.stopping = true
 	gen.completed.Wait()
 	return nil
 }

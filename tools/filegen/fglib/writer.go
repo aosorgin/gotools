@@ -34,7 +34,7 @@ func writeFile(path string, size uint64, gen *Generator) {
 		}
 		_, err = gen.Read(buffer)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to write '%'.\n", path)
+			fmt.Fprintf(os.Stderr, "Error: Failed to write '%s'.\n", path)
 		}
 		file.Write(buffer)
 		size -= uint64(len(buffer))
