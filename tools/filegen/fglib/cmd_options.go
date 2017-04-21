@@ -37,6 +37,7 @@ type CmdOptions struct {
 		FileSize uint64 // File size for each tree level
 	}
 	Change struct {
+		Ratio    float64      // Change ratio
 		Interval IntervalType // Interval to change files
 		Once     bool         // Use once if true otherwise until the end of file
 		Reverse  bool         // Change file from end if true
@@ -123,6 +124,7 @@ func ParseCmdOptions() {
 	flag.UintVar(&Options.Generate.Folders, "folders", 1, "Number of folders to generate")
 	flag.Uint64Var(&Options.Generate.FileSize, "size", 0, "Size of files to generate")
 
+	flag.Float64Var(&Options.Change.Ratio, "change-ratio", float64(1), "Change ratio (files count). Could be in [0;1]")
 	flag.BoolVar(&Options.Change.Once, "once", false, "Process interval only once. By default is false")
 	flag.BoolVar(&Options.Change.Reverse, "reverse", false, "Process interval from the end of file. By default is false")
 	interval := flag.String("interval", "", "Interval to change file. By default do not changes the file")

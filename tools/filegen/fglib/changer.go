@@ -8,6 +8,7 @@ Brief:     Files changer for random generator
 package fglib
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -132,6 +133,83 @@ func ParseInterval(data string) (result IntervalType, err error) {
 	return
 }
 
+/* Get random subset in sequence mode */
+
+type SequenceChecker interface {
+	Check() (bool, error)
+}
+
+type RandomSubSet struct { // implements SequenceChecker
+	gen      *Generator
+	weight   float64
+	hitScore float64
+	length   uint64
+	count    uint64
+	index    uint64
+	hits     uint64
+}
+
+func (r *RandomSubSet) Init(gen *Generator, count uint64, length uint64) error {
+	if length == 0 {
+		return fmt.Errorf("length argument cannot be 0")
+	}
+
+	if count > length {
+		return fmt.Errorf("count(%d) argument cannot be more than length(%d)", count, length)
+	}
+
+	r.gen = gen
+	r.count = count
+	r.length = length
+	r.weight = float64(length-1) / float64(length)
+	r.hitScore = float64(length-uint64((float64(count)/1.4))) / float64(length)
+	return nil
+}
+
+func (r *RandomSubSet) Check() (bool, error) {
+	if r.hits >= r.count || r.index >= r.length {
+		return false, nil
+	}
+
+	if (r.count - r.hits) == (r.length - r.index) {
+		r.hitScore = 0
+		r.index++
+		r.hits++
+		return true, nil
+	}
+
+	v, err := r.getFloat64()
+	if err != nil {
+		return false, err
+	}
+
+	r.index++
+	if v > r.hitScore {
+		r.hits++
+		r.hitScore *= r.weight
+		return true, nil
+	}
+	return false, nil
+}
+
+func (r *RandomSubSet) getFloat64() (float64, error) {
+	var v uint64
+	err := binary.Read(r.gen, binary.LittleEndian, &v)
+	if err != nil {
+		return float64(0), err
+	}
+	return (float64(v) / float64(^uint64(0))), nil
+}
+
+/* Simple checker that returns always true */
+
+type AlwaysTrueChecker struct {
+}
+
+func (r *AlwaysTrueChecker) Check() (bool, error) {
+	return true, nil
+}
+
 /* Changer implementation */
 
 type Changer struct {
@@ -189,16 +267,16 @@ func changeFile(path string, info os.FileInfo, c *Changer) error {
 				if (size - new_offset) < i.modify.value {
 					file.Seek(0, io.SeekStart)
 				} else {
-					file.Seek(size - new_offset - i.modify.value, io.SeekStart)
+					file.Seek(size-new_offset-i.modify.value, io.SeekStart)
 				}
-				write_size = min(size - new_offset, i.modify.value)
+				write_size = min(size-new_offset, i.modify.value)
 			} else {
 				file.Seek(new_offset, io.SeekStart)
-				write_size = min(i.modify.value, size - new_offset)
+				write_size = min(i.modify.value, size-new_offset)
 			}
 			offset = new_offset
 		} else {
-			write_size = min(i.modify.value, size - new_offset)
+			write_size = min(i.modify.value, size-new_offset)
 		}
 
 		writen, err := io.CopyN(file, c.gen, write_size)
@@ -225,11 +303,11 @@ func changeFile(path string, info os.FileInfo, c *Changer) error {
 func getFilesCount(path string) (filesCount int64, err error) {
 	filesCount = 0
 	filepath.Walk(Options.Path, func(path string, info os.FileInfo, err error) error {
-			if info.IsDir() {
-				return nil
-			}
-			filesCount++
+		if info.IsDir() {
 			return nil
+		}
+		filesCount++
+		return nil
 	})
 	return
 }
@@ -238,21 +316,40 @@ func (c *Changer) ModifyFiles() error {
 	completeSignal := make(chan bool)
 	filesProcessed := 0
 	var totalFiles int64
+	var fileSelector SequenceChecker
+
+	if Options.Change.Ratio < 1 {
+		var err error
+		totalFiles, err = getFilesCount(Options.Path)
+		if err != nil {
+			return err
+		}
+		r := new(RandomSubSet)
+		r.Init(c.gen, uint64(Options.Change.Ratio*float64(totalFiles)), uint64(totalFiles))
+		fileSelector = r
+	} else {
+		go func() {
+			totalFiles, _ = getFilesCount(Options.Path)
+		}()
+		fileSelector = new(AlwaysTrueChecker)
+	}
 
 	go func() {
 		filepath.Walk(Options.Path, func(path string, info os.FileInfo, err error) error {
 			if info.IsDir() {
 				return nil
 			}
-			e := changeFile(path, info, c)
-			filesProcessed++
-			return e
+			r, err := fileSelector.Check()
+			if err != nil {
+				return err
+			}
+			if r == true {
+				err = changeFile(path, info, c)
+				filesProcessed++
+			}
+			return err
 		})
 		completeSignal <- true
-	}()
-
-	go func() {
-		totalFiles, _ = getFilesCount(Options.Path)
 	}()
 
 	report := func() {
