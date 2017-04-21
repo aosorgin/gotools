@@ -15,16 +15,13 @@ import
 	"io"
 	"path/filepath"
 	"os"
-	"sync"
 	"fmt"
 	"runtime"
 	"time"
 )
 
-func compress_file(srcPath string, destPath string, sem *chan bool, wg *sync.WaitGroup, fc *int) (writen int64, err error) {
-	defer wg.Done()
-	defer func() { <-*sem }()
-	defer func() { *fc -= 1	}()
+func compress_file(srcPath string, destPath string, processedSignal *chan bool) (writen int64, err error) {
+	defer func() { *processedSignal <- true }()
 
 	src, err := os.Open(srcPath)
 	if err != nil {
@@ -63,42 +60,48 @@ func compress_file(srcPath string, destPath string, sem *chan bool, wg *sync.Wai
 }
 
 func Compress(srcPath string, dstPath string) (err error) {
-	var wg sync.WaitGroup
-	sem := make (chan bool, runtime.NumCPU() + 1)
-	filesCount, filesRemain := 0, 0
-	fmt.Print("Processing files: 0")
-	lastReportTime := time.Now()
-	filepath.Walk(srcPath, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			return nil
-		}
-		relPath, err := filepath.Rel(srcPath, path)
-		dirPath, _ := filepath.Split(relPath)
-		os.MkdirAll(filepath.Join(dstPath, dirPath), os.ModeDir)
-		if err == nil {
-			wg.Add(1)
-			filesCount += 1
-			filesRemain += 1
-			sem <- true
-			go compress_file(path, filepath.Join(dstPath, relPath + ".zip"), &sem, &wg, &filesRemain)
-			if time.Since(lastReportTime) > time.Second {
-				lastReportTime = time.Now()
-				fmt.Printf("\rProcessing files: %d          ", filesCount)
-			}
-		}
-		return err
-	})
-	fmt.Printf("\rProcessing files: %d          \n", filesCount)
-
+	processingQueue := make(chan bool, runtime.NumCPU() + 1)
+	processedSignal := make(chan bool)
+	filesCount, filesProcessed := 0, 0
+	completedSignal := make(chan bool)
 	completed := false
-	go func() {
-		wg.Wait()
-		completed = true
+	go func () {
+		filepath.Walk(srcPath, func(path string, info os.FileInfo, err error) error {
+			if info.IsDir() {
+				return nil
+			}
+			relPath, err := filepath.Rel(srcPath, path)
+			dirPath, _ := filepath.Split(relPath)
+			os.MkdirAll(filepath.Join(dstPath, dirPath), os.ModeDir)
+			if err == nil {
+				filesCount++
+				processingQueue <- true
+				go compress_file(path, filepath.Join(dstPath, relPath + ".zip"), &processedSignal)
+			}
+			return nil
+		})
+		completedSignal <- true
 	}()
-	for completed == false {
-		fmt.Printf("\rRemain to process: %d         ", filesRemain)
-		time.Sleep(time.Second)
+
+	timeout := time.Tick(time.Second)
+	for {
+		select {
+		case <-processedSignal:
+			filesProcessed++
+			<-processingQueue
+			if completed == true && filesCount == filesProcessed {
+				fmt.Printf("\rProcessing/processed files: (%d/%d)          \nDone", filesCount, filesProcessed)
+				return
+			}
+		case <- completedSignal:
+			completed = true
+			if filesCount == filesProcessed {
+				fmt.Printf("\rProcessing/processed files: (%d/%d)          \nDone", filesCount, filesProcessed)
+				return
+			}
+		case <-timeout:
+			fmt.Printf("\rProcessing/processed files: (%d/%d)          ", filesCount, filesProcessed)
+		}
 	}
-	fmt.Printf("\rRemain to process: 0         \nDone")
 	return
 }
