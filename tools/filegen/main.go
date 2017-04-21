@@ -8,12 +8,29 @@ Brief:     Tool to generate files
 package main
 
 import (
+	"fmt"
 	"github.com/aosorgin/gotools/tools/filegen/fglib"
+	"os"
 )
 
 func main() {
 	fglib.ParseCmdOptions()
 
-	var gen fglib.CryptoGenerator
-	fglib.WriteFiles(&gen)
+	var writer fglib.DataWriter
+	err := writer.Init(new(fglib.CryptoGenerator))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error: Failed to initialize generator with error", err)
+		return
+	}
+	defer func() {
+		err = writer.Close()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error: Failed to close generator with error", err)
+		}
+	}()
+
+	err = writer.WriteFiles()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error: Failed to generate files with error", err)
+	}
 }
