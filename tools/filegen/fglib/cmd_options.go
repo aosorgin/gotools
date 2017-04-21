@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 )
 
 // CommandEnum
@@ -18,10 +19,18 @@ const (
 	CommandGenerate = iota
 )
 
+// GeneratorEnum
+const (
+	GeneratorCrypto = iota
+	GeneratorPseudo
+)
+
 type CmdOptions struct {
-	Command  int    // CommandEnum
-	Path     string // Root path got processing files
-	Generate struct {
+	Command       int    // CommandEnum
+	Path          string // Root path got processing files
+	GeneratorType int    // GeneratorEnum
+	Seed          []byte
+	Generate      struct {
 		Folders  uint   // Folders tree count. For example [3,4] - 3 folders in root, 4 folders in previous, etc.
 		Files    uint   // Files count in each tree level
 		FileSize uint64 // File size for each tree level
@@ -63,6 +72,26 @@ func processGenerateCommand() {
 	}
 }
 
+func processGeneratorType(genType string, seed uint64) {
+	if genType == "crypto" {
+		Options.GeneratorType = GeneratorCrypto
+		if seed != 0 {
+			fmt.Fprintf(os.Stderr, "Error: seed is not used with crypto generator.\n")
+		}
+	} else if genType == "pseudo" {
+		Options.GeneratorType = GeneratorPseudo
+		if seed == 0 {
+			seed = uint64(time.Now().UnixNano())
+		}
+		Options.Seed = SeedFromUint64(seed)
+		fmt.Println("Using seed:", seed)
+	} else {
+		fmt.Fprintf(os.Stderr, "Error: invalid generator type '%s'.\n", genType)
+		flag.Usage()
+		os.Exit(1)
+	}
+}
+
 func processCommand(cmd string) {
 	if cmd == "gen" {
 		Options.Command = CommandGenerate
@@ -83,9 +112,13 @@ func ParseCmdOptions() {
 
 	flag.StringVar(&Options.Path, "path", "", "Path to root folder to generate files")
 
-	cmd := flag.String("cmd", "gen", "Command to execute. Could be [gen]")
+	genType := flag.String("gen-type", "crypto", "Generator type. [(random), pseudo]")
+	seed := flag.Uint64("seed", 0, "Seed for data generator. Could be used with pseudo generator")
+
+	cmd := flag.String("cmd", "gen", "Command to execute. Could be [(gen)]")
 
 	/* Parsing command-line */
 	flag.Parse()
 	processCommand(*cmd)
+	processGeneratorType(*genType, *seed)
 }
