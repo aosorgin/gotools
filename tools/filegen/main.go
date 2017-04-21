@@ -19,11 +19,11 @@ func main() {
 	var writer fglib.DataWriter
 	var gen fglib.Generator
 	if fglib.Options.GeneratorType == fglib.GeneratorCrypto {
-		gen.SetDataGenerator(new(fglib.CryptoGenerator))
+		gen.SetDataGenerator(new(fglib.CryptoGenerator), new(fglib.UnorderedQueue))
 	} else if fglib.Options.GeneratorType == fglib.GeneratorPseudo {
 		var dataGen fglib.PseudoRandomGenerator
 		dataGen.Seed(fglib.Options.Seed)
-		gen.SetDataGenerator(&dataGen)
+		gen.SetDataGenerator(&dataGen, new(fglib.OrderedQueue))
 	} else {
 		panic("Invalid generator type")
 	}

@@ -76,7 +76,7 @@ func processGeneratorType(genType string, seed uint64) {
 	if genType == "crypto" {
 		Options.GeneratorType = GeneratorCrypto
 		if seed != 0 {
-			fmt.Fprintf(os.Stderr, "Error: seed is not used with crypto generator.\n")
+			fmt.Fprintf(os.Stderr, "Warning: seed is not used with crypto generator.\n")
 		}
 	} else if genType == "pseudo" {
 		Options.GeneratorType = GeneratorPseudo
