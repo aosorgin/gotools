@@ -7,7 +7,6 @@ Brief:     Files writer for random generator
 
 package fglib
 
-import ()
 import (
 	"bufio"
 	"fmt"
@@ -16,7 +15,7 @@ import (
 	"time"
 )
 
-func writeFile(path string, size uint64, gen Generator) {
+func writeFile(path string, size uint64, gen *Generator) {
 	rawFile, err := os.Create(path)
 	if err != nil {
 		return
@@ -43,10 +42,10 @@ func writeFile(path string, size uint64, gen Generator) {
 }
 
 type DataWriter struct {
-	gen Generator
+	gen *Generator
 }
 
-func (w *DataWriter) Init(gen Generator) error {
+func (w *DataWriter) Init(gen *Generator) error {
 	w.gen = gen
 	return w.gen.Init()
 }

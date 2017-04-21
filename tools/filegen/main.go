@@ -17,7 +17,9 @@ func main() {
 	fglib.ParseCmdOptions()
 
 	var writer fglib.DataWriter
-	err := writer.Init(new(fglib.CryptoGenerator))
+	var gen fglib.Generator
+	gen.SetDataGenerator(new(fglib.CryptoGenerator))
+	err := writer.Init(&gen)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: Failed to initialize generator with error", err)
 		return
