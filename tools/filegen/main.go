@@ -5,4 +5,15 @@ Copyright: Alexey Osorgin, 2017
 Brief:     Tool to generate files
 */
 
-package filegen
+package main
+
+import (
+	"github.com/aosorgin/gotools/tools/filegen/fglib"
+)
+
+func main() {
+	fglib.ParseCmdOptions()
+
+	var gen fglib.CryptoGenerator
+	fglib.WriteFiles(&gen)
+}
