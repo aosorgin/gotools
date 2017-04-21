@@ -61,7 +61,7 @@ func (w *DataWriter) WriteFiles() error {
 	go func() {
 		for i := uint(0); i < Options.Generate.Folders; i++ {
 			folderPath := filepath.Join(Options.Path, fmt.Sprintf("dir%04d", i))
-			os.MkdirAll(folderPath, os.ModeDir)
+			os.MkdirAll(folderPath, os.ModeDir | 0755)
 			for j := uint(0); j < Options.Generate.Files; j++ {
 				writeFile(filepath.Join(folderPath, fmt.Sprintf("file%04d", j)), Options.Generate.FileSize, w.gen)
 				filesGenerated += 1

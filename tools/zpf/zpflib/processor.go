@@ -72,7 +72,7 @@ func Compress(srcPath string, dstPath string) (err error) {
 			}
 			relPath, err := filepath.Rel(srcPath, path)
 			dirPath, _ := filepath.Split(relPath)
-			os.MkdirAll(filepath.Join(dstPath, dirPath), os.ModeDir)
+			os.MkdirAll(filepath.Join(dstPath, dirPath), os.ModeDir | 0755)
 			if err == nil {
 				filesCount++
 				processingQueue <- true
