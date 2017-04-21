@@ -222,9 +222,22 @@ func changeFile(path string, info os.FileInfo, c *Changer) error {
 	return nil
 }
 
+func getFilesCount(path string) (filesCount int64, err error) {
+	filesCount = 0
+	filepath.Walk(Options.Path, func(path string, info os.FileInfo, err error) error {
+			if info.IsDir() {
+				return nil
+			}
+			filesCount++
+			return nil
+	})
+	return
+}
+
 func (c *Changer) ModifyFiles() error {
 	completeSignal := make(chan bool)
 	filesProcessed := 0
+	var totalFiles int64
 
 	go func() {
 		filepath.Walk(Options.Path, func(path string, info os.FileInfo, err error) error {
@@ -232,19 +245,31 @@ func (c *Changer) ModifyFiles() error {
 				return nil
 			}
 			e := changeFile(path, info, c)
-			filesProcessed += 1
+			filesProcessed++
 			return e
 		})
 		completeSignal <- true
 	}()
 
+	go func() {
+		totalFiles, _ = getFilesCount(Options.Path)
+	}()
+
+	report := func() {
+		if totalFiles == 0 {
+			fmt.Printf("\rProcessed: %d        ", filesProcessed)
+		} else {
+			fmt.Printf("\rProcessed: (%d/%d)        ", filesProcessed, totalFiles)
+		}
+	}
+
 	timeout := time.Tick(time.Second)
 	for {
 		select {
 		case <-timeout:
-			fmt.Printf("\rProcessed: %d        ", filesProcessed)
+			report()
 		case <-completeSignal:
-			fmt.Printf("\rProcessed: %d        ", filesProcessed)
+			report()
 			return nil
 		}
 	}
