@@ -1,3 +1,10 @@
+/*
+Author:    Alexey Osorgin (alexey.osorgin@gmail.com)
+Copyright: Alexey Osorgin, 2017
+
+Brief:     Compressing of files
+ */
+
 package zpflib
 
 import
@@ -37,7 +44,13 @@ func compress_file(srcPath string, destPath string, sem *chan bool, wg *sync.Wai
 	zipWriter := zip.NewWriter(dst)
 	defer  zipWriter.Close()
 	zipWriter.RegisterCompressor(zip.Deflate, func(out io.Writer) (io.WriteCloser, error) {
-		return flate.NewWriter(out, flate.DefaultCompression)
+		if Options.Compression == CompressionFast {
+			return flate.NewWriter(out, flate.BestSpeed)
+		} else if Options.Compression == CompressionBest {
+			return flate.NewWriter(out, flate.BestCompression)
+		} else {
+			return flate.NewWriter(out, flate.DefaultCompression)
+		}
 	})
 
 	_, fileName := filepath.Split(srcPath)

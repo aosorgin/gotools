@@ -1,3 +1,11 @@
+/*
+Author:    Alexey Osorgin (alexey.osorgin@gmail.com)
+Copyright: Alexey Osorgin, 2017
+
+Brief:     Tool to compress the single files into separate zip files with storing file hierarchy
+ */
+
+
 package main
 
 import (
