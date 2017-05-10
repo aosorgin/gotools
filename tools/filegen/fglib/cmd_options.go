@@ -46,9 +46,18 @@ type CmdOptions struct {
 
 var Options CmdOptions
 
+func processFileSize(rawSize string) {
+	var err error
+	Options.Generate.FileSize, err = ParseSize(rawSize)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
 func processInterval(interval string) {
 	if interval == "" {
-		Options.Change.Interval = GetEmptyInterval()
+		Options.Change.Interval = GetFullInterval()
 	} else {
 		var err error
 		Options.Change.Interval, err = ParseInterval(interval)
@@ -122,7 +131,7 @@ func ParseCmdOptions() {
 
 	flag.UintVar(&Options.Generate.Files, "files", 0, "Number of files to generate")
 	flag.UintVar(&Options.Generate.Folders, "folders", 1, "Number of folders to generate")
-	flag.Uint64Var(&Options.Generate.FileSize, "size", 0, "Size of files to generate")
+	fileSize := flag.String("size", "0", "Size of files to generate")
 
 	flag.Float64Var(&Options.Change.Ratio, "change-ratio", float64(1), "Change ratio (files count). Could be in [0;1]")
 	flag.BoolVar(&Options.Change.Once, "once", false, "Process interval only once. By default is false")
@@ -138,6 +147,7 @@ func ParseCmdOptions() {
 
 	/* Parsing command-line */
 	flag.Parse()
+	processFileSize(*fileSize)
 	processInterval(*interval)
 	processCommand(*cmd)
 	processGeneratorType(*genType, *seed)

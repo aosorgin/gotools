@@ -133,6 +133,39 @@ func ParseInterval(data string) (result IntervalType, err error) {
 	return
 }
 
+func ParseSize(rawSize string) (uint64, error) {
+	r := regexp.MustCompile("([\\d]*)([kKmMgG]{0,1})").FindStringSubmatch(rawSize)
+
+	if len(r) < 2 {
+		return uint64(0), fmt.Errorf("Invalid size format for '%s'", rawSize)
+	}
+
+	size, err := strconv.ParseInt(r[1], 10, 0)
+	if err != nil {
+		return uint64(0), err
+	}
+
+	switch r[2] {
+	case "k":
+		size *= 1000
+	case "K":
+		size *= 1024
+	case "m":
+		size *= 1000 * 1000
+	case "M":
+		size *= 1024 * 1024
+	case "g":
+		size *= 1000 * 1000 * 1000
+	case "G":
+		size *= 1024 * 1024 * 1024
+	case "":
+	default:
+		panic(fmt.Errorf("Invalid postfix in regex"))
+	}
+
+	return uint64(size), nil
+}
+
 /* Get random subset in sequence mode */
 
 type SequenceChecker interface {
