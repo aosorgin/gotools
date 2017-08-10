@@ -25,6 +25,7 @@ const (
 const (
 	GeneratorCrypto = iota
 	GeneratorPseudo
+	GeneratorNull
 )
 
 type CmdOptions struct {
@@ -105,7 +106,12 @@ func processGeneratorType(genType string, seed uint64) {
 		}
 		Options.Seed = SeedFromUint64(seed)
 		fmt.Println("Using seed:", seed)
-	} else {
+	} else  if genType == "null" {
+		Options.GeneratorType = GeneratorNull
+		if seed != 0 {
+			fmt.Fprintf(os.Stderr, "Warning: seed is not used with null generator.\n")
+		}
+	} else 	{
 		fmt.Fprintf(os.Stderr, "Error: invalid generator type '%s'.\n", genType)
 		usage(os.Stderr)
 		os.Exit(1)
@@ -158,6 +164,7 @@ func usage(f io.Writer) {
 	fmt.Fprintln(f, "  -g, --generator            Type of generator to use")
 	fmt.Fprintln(f, "     crypto                  Crypto random data generator. Used by default.")
 	fmt.Fprintln(f, "     pseudo                  Pseudo random data generator")
+	fmt.Fprintln(f, "     null                    Null contains data generator")
 	fmt.Fprintln(f, "  --seed                     Initial seed for generated data. Can be used only with 'pseudo' generator")
 	fmt.Fprintln(f)
 
