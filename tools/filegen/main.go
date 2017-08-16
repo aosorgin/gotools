@@ -21,6 +21,8 @@ func getGenerator() *fglib.Generator {
 		var dataGen fglib.PseudoRandomGenerator
 		dataGen.Seed(fglib.Options.Seed)
 		gen.SetDataGenerator(&dataGen, new(fglib.OrderedQueue))
+	} else if fglib.Options.GeneratorType == fglib.GeneratorNull {
+		gen.SetDataGenerator(new(fglib.NullGenerator), new(fglib.UnorderedQueue))
 	} else {
 		panic("Invalid generator type")
 	}
