@@ -1,3 +1,10 @@
+/*
+Author:    Alexey Osorgin (alexey.osorgin@gmail.com)
+Copyright: Alexey Osorgin, 2017
+
+Brief:     RB-tree's implementation
+*/
+
 package trees
 
 // KeyType is used as rb-tree node's key type
@@ -29,6 +36,13 @@ func (n *node) uncle() *node {
 	}
 
 	return grand.left
+}
+
+func (n *node) subling() *node {
+	if n.parent.left == n {
+		return n.parent.right
+	}
+	return n.parent.left
 }
 
 func (n *node) rotateLeft() {
@@ -69,12 +83,11 @@ func (n *node) rotateRight() {
 	n.parent = pivot
 }
 
-// OuterLeft finds out node where node.key <= key
-func (n *node) outerLeft(key KeyType) *node {
+func (n *node) parentToInsert(key KeyType) *node {
 	cur, parent := n, n.parent
 	for cur != nil {
 		if key == cur.key {
-			return cur
+			return nil
 		}
 
 		parent = cur
@@ -86,6 +99,40 @@ func (n *node) outerLeft(key KeyType) *node {
 	}
 
 	return parent
+}
+
+// outerLeft finds out minimum node where node.key >= key
+func (n *node) outerLeft(key KeyType) *node {
+	cur := n
+	var candidate *node
+	for cur != nil {
+		if key < cur.key {
+			cur = cur.left
+		} else {
+			candidate = cur
+			cur = cur.right
+		}
+	}
+
+	return candidate
+}
+
+// outerRight finds out minimum node where node.key > key
+func (n *node) outerRight(key KeyType) *node {
+	cur := n
+	var candidate *node
+	for cur != nil {
+		if key < cur.key {
+			cur = cur.left
+		} else {
+			if key > cur.key {
+				candidate = cur
+			}
+			cur = cur.right
+		}
+	}
+
+	return candidate
 }
 
 // Set is used to store keys in rb-tree
@@ -144,17 +191,9 @@ func optimizeAfterInsert(n *node) *node {
 	return nil
 }
 
-// Insert node to rb-tree
-func (s *Set) Insert(key KeyType) bool {
-	if s.root == nil {
-		s.root = &node{
-			key: key,
-		}
-		return true
-	}
-
-	parent := s.root.outerLeft(key)
-	if parent.key == key {
+func (n *node) insert(key KeyType) bool {
+	parent := n.parentToInsert(key)
+	if parent == nil {
 		return false
 	}
 
@@ -172,6 +211,22 @@ func (s *Set) Insert(key KeyType) bool {
 
 	for node != nil {
 		node = optimizeAfterInsert(node)
+	}
+
+	return true
+}
+
+// Insert node to rb-tree
+func (s *Set) Insert(key KeyType) bool {
+	if s.root == nil {
+		s.root = &node{
+			key: key,
+		}
+		return true
+	}
+
+	if s.root.insert(key) == false {
+		return false
 	}
 
 	for s.root.parent != nil {
