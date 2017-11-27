@@ -27,6 +27,34 @@ func TestInsertedNodesAreFouneded(t *testing.T) {
 	}
 }
 
+func TestDeletedNodesAreNotFounded(t *testing.T) {
+	var s Set
+	maxNodes := 10000
+	for i := 0; i < maxNodes; i++ {
+		if s.Insert(KeyType(i)) == false {
+			t.Error(fmt.Errorf("failed to insert node '%d'", i))
+		}
+	}
+
+	for i := 0; i < maxNodes; i++ {
+		if s.Delete(KeyType(i)) == false {
+			t.Error(fmt.Errorf("failed to remove node '%d'", i))
+		}
+
+		for j := 0; j <= i; j++ {
+			if s.Lookup(KeyType(j)) == true {
+				t.Error(fmt.Errorf("deleted node '%d' is found", i))
+			}
+		}
+
+		for j := i; j < maxNodes; j++ {
+			if s.Lookup(KeyType(j)) == false {
+				t.Error(fmt.Errorf("failed fo find node '%d'", i))
+			}
+		}
+	}
+}
+
 func TestDoNotFoundUnknownNodes(t *testing.T) {
 	var s Set
 	for i := 0; i < 1000; i++ {
@@ -111,8 +139,15 @@ func TestAllPathsHaveTheSameBlackNodesCount(t *testing.T) {
 				t.Error(fmt.Errorf("failed fo insert node '%d'", i))
 			}
 		}
-
 		var maxDepth int
 		getTreeDepth(t, s.root, 0, &maxDepth)
+
+		for i := 0; i < max; i++ {
+			if s.Delete(KeyType(i)) == false {
+				t.Error(fmt.Errorf("failed fo remove node '%d'", i))
+			}
+			maxDepth = 0
+			getTreeDepth(t, s.root, 0, &maxDepth)
+		}
 	}
 }

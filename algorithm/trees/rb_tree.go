@@ -135,19 +135,12 @@ func (n *node) outerRight(key KeyType) *node {
 	return candidate
 }
 
-// Set is used to store keys in rb-tree
-type Set struct {
-	root *node
-}
-
-// Lookup find the node where node.key == key
-func (s *Set) Lookup(key KeyType) bool {
-	n := s.root.outerLeft(key)
-	if key == n.key {
-		return true
+func (n *node) lookup(key KeyType) *node {
+	node := n.outerLeft(key)
+	if node != nil && node.key == key {
+		return node
 	}
-
-	return false
+	return nil
 }
 
 func optimizeAfterInsert(n *node) *node {
@@ -216,6 +209,159 @@ func (n *node) insert(key KeyType) bool {
 	return true
 }
 
+func exclude(n *node) {
+	n.parent = nil
+	n.left = nil
+	n.right = nil
+}
+
+func bugOn(condition bool) {
+	if condition == true {
+		panic("BUG!!!")
+	}
+}
+
+func deleteOptimized(n *node) (parent *node) {
+	/* Check if node has at least one ont null child. This child has to be the red one */
+
+	var child *node
+	if n.left != nil {
+		child = n.left
+	} else if n.right != nil {
+		child = n.right
+	}
+
+	/* if node is root just make the child as root if it exists */
+
+	if n.parent == nil {
+		if child != nil {
+			child.parent = nil
+			child.isRed = false
+			return child
+		}
+	}
+
+	parent = n.parent
+
+	if child != nil {
+		if n.parent.left == n {
+			n.parent.left = child
+		} else {
+			n.parent.right = child
+		}
+		child.parent = n.parent
+		child.isRed = false
+		return
+	}
+
+	/* if sibling is a right child of parent */
+
+	if n.parent.left == n {
+		n.parent.left = nil
+		sibling := n.parent.right
+
+		/* if sibling is black and it has at least one red child */
+		if sibling.isRed == false {
+			if sibling.right != nil {
+				bugOn(sibling.right.isRed == false)
+				sibling.right.isRed = false
+				n.parent.rotateLeft()
+			} else if sibling.left != nil {
+				bugOn(sibling.left.isRed == false)
+				sibling.isRed = false
+				sibling.left.isRed = false
+				sibling.rotateRight()
+				n.parent.rotateLeft()
+			} else {
+				sibling.isRed = true
+				if n.parent.isRed == true {
+					n.parent.isRed = false
+				} else {
+					deleteOptimized(n.parent)
+				}
+			}
+		} else {
+			/* if sibling is black */
+			bugOn(sibling.left == nil || sibling.left.isRed == true)
+			bugOn(sibling.right == nil || sibling.right.isRed == true)
+			sibling.left.isRed = true
+			n.parent.rotateLeft()
+		}
+	} else {
+		n.parent.right = nil
+		sibling := n.parent.left
+
+		/* if sibling is black and it has at least one red child */
+		if sibling.isRed == false {
+			if sibling.left != nil {
+				bugOn(sibling.left.isRed == false)
+				sibling.left.isRed = false
+				n.parent.rotateRight()
+			} else if sibling.right != nil {
+				bugOn(sibling.right.isRed == false)
+				sibling.isRed = false
+				sibling.left.isRed = false
+				sibling.rotateLeft()
+				n.parent.rotateRight()
+			} else {
+				sibling.isRed = true
+				if n.parent.isRed == true {
+					n.parent.isRed = false
+				} else {
+					deleteOptimized(n.parent)
+				}
+			}
+		} else {
+			/* if sibling is black */
+			bugOn(sibling.left == nil || sibling.left.isRed == true)
+			bugOn(sibling.right == nil || sibling.right.isRed == true)
+			sibling.right.isRed = true
+			n.parent.rotateRight()
+		}
+	}
+	return
+}
+
+func (n *node) delete(key KeyType) (isDeleted bool, root *node) {
+	node := n.lookup(key)
+	if node == nil {
+		return false, n
+	}
+
+	isDeleted = true
+
+	if node.left != nil && node.right != nil {
+		successor := node.right.outerRight(key)
+		/* TODO: exchange node with successor */
+		node.key = successor.key
+		deleteOptimized(successor)
+		exclude(successor)
+		root = n
+	} else {
+		root = deleteOptimized(node)
+		for root.parent != nil {
+			root = root.parent
+		}
+		exclude(node)
+	}
+	return
+}
+
+// Set is used to store keys in rb-tree
+type Set struct {
+	root *node
+}
+
+// Lookup find the node where node.key == key
+func (s *Set) Lookup(key KeyType) bool {
+	n := s.root.outerLeft(key)
+	if n == nil || key != n.key {
+		return false
+	}
+
+	return true
+}
+
 // Insert node to rb-tree
 func (s *Set) Insert(key KeyType) bool {
 	if s.root == nil {
@@ -234,4 +380,14 @@ func (s *Set) Insert(key KeyType) bool {
 	}
 
 	return true
+}
+
+// Delete is remove node from rb-tree
+func (s *Set) Delete(key KeyType) (result bool) {
+	if s.root == nil {
+		return false
+	}
+
+	result, s.root = s.root.delete(key)
+	return
 }
