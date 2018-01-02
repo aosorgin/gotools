@@ -27,7 +27,7 @@ func TestInsertedNodesAreFouneded(t *testing.T) {
 	}
 }
 
-/*func TestDeletedNodesAreNotFounded(t *testing.T) {
+func TestDeletedNodesAreNotFounded(t *testing.T) {
 	var s Set
 	maxNodes := 10
 	for i := 0; i < maxNodes; i++ {
@@ -43,17 +43,17 @@ func TestInsertedNodesAreFouneded(t *testing.T) {
 
 		for j := 0; j <= i; j++ {
 			if s.Lookup(KeyType(j)) == true {
-				t.Error(fmt.Errorf("deleted node '%d' is found", i))
+				t.Error(fmt.Errorf("deleted node '%d' is found", j))
 			}
 		}
 
-		for j := i; j < maxNodes; j++ {
+		for j := i + 1; j < maxNodes; j++ {
 			if s.Lookup(KeyType(j)) == false {
-				t.Error(fmt.Errorf("failed fo find node '%d'", i))
+				t.Error(fmt.Errorf("failed fo find node '%d'", j))
 			}
 		}
 	}
-}*/
+}
 
 func TestDoNotFoundUnknownNodes(t *testing.T) {
 	var s Set
@@ -90,6 +90,10 @@ func getNodePath(n *node) string {
 }
 
 func getTreeDepth(t *testing.T, n *node, depth int, maxDepth *int) {
+	if n == nil {
+		return
+	}
+
 	nextDepth := depth
 	if !n.isRed {
 		nextDepth++
@@ -123,6 +127,10 @@ func printChildren(n *node) {
 }
 
 func printTree(n *node) {
+	if n == nil {
+		return
+	}
+
 	for n.parent != nil {
 		n = n.parent
 	}
@@ -131,23 +139,44 @@ func printTree(n *node) {
 }
 
 func TestAllPathsHaveTheSameBlackNodesCount(t *testing.T) {
-
-	for max := 10; max < 10; max *= 2 {
-		var s Set
-		for i := 0; i < max; i++ {
-			if s.Insert(KeyType(i)) == false {
-				t.Error(fmt.Errorf("failed fo insert node '%d'", i))
-			}
+	max := 5000
+	var s Set
+	for i := 0; i < max; i++ {
+		if s.Insert(KeyType(i)) == false {
+			t.Error(fmt.Errorf("failed fo insert node '%d'", i))
 		}
 		var maxDepth int
 		getTreeDepth(t, s.root, 0, &maxDepth)
+	}
 
-		for i := 0; i < max; i++ {
-			if s.Delete(KeyType(i)) == false {
-				t.Error(fmt.Errorf("failed fo remove node '%d'", i))
-			}
-			maxDepth = 0
-			getTreeDepth(t, s.root, 0, &maxDepth)
+	/*for i := 0; i < max; i++ {
+		if s.Delete(KeyType(i)) == false {
+			t.Error(fmt.Errorf("failed fo remove node '%d'", i))
 		}
+		var maxDepth int
+		getTreeDepth(t, s.root, 0, &maxDepth)
+	}*/
+}
+
+func TestAllPathsHaveTheSameBlackNodesCountFixed(t *testing.T) {
+	max := 12
+
+	var s Set
+	for i := 0; i < max; i++ {
+		if s.Insert(KeyType(i)) == false {
+			t.Error(fmt.Errorf("failed fo insert node '%d'", i))
+		}
+	}
+
+	printTree(s.root)
+
+	for i := 0; i < max; i++ {
+		fmt.Printf("\nRemoving %d...\n\n", i)
+		if s.Delete(KeyType(i)) == false {
+			t.Error(fmt.Errorf("failed fo remove node '%d'", i))
+		}
+		printTree(s.root)
+		var maxDepth int
+		getTreeDepth(t, s.root, 0, &maxDepth)
 	}
 }

@@ -239,6 +239,7 @@ func deleteOptimized(n *node) (parent *node) {
 			child.isRed = false
 			return child
 		}
+		return nil
 	}
 
 	parent = n.parent
@@ -254,20 +255,37 @@ func deleteOptimized(n *node) (parent *node) {
 		return
 	}
 
+	if n.parent.left == n {
+		optimizedAfterDeletion(n)
+		n.parent.left = nil
+	} else {
+		optimizedAfterDeletion(n)
+		n.parent.right = nil
+	}
+	return
+}
+
+func optimizedAfterDeletion(n *node) {
+	if n.parent == nil {
+		n.isRed = false
+		return
+	}
+
 	/* if sibling is a right child of parent */
 
 	if n.parent.left == n {
-		n.parent.left = nil
+		if n.isRed == true {
+			return
+		}
+
 		sibling := n.parent.right
 
 		/* if sibling is black and it has at least one red child */
 		if sibling.isRed == false {
-			if sibling.right != nil {
-				bugOn(sibling.right.isRed == false)
+			if sibling.right != nil && sibling.right.isRed == true {
 				sibling.right.isRed = false
 				n.parent.rotateLeft()
-			} else if sibling.left != nil {
-				bugOn(sibling.left.isRed == false)
+			} else if sibling.left != nil && sibling.left.isRed == true {
 				sibling.isRed = false
 				sibling.left.isRed = false
 				sibling.rotateRight()
@@ -277,7 +295,7 @@ func deleteOptimized(n *node) (parent *node) {
 				if n.parent.isRed == true {
 					n.parent.isRed = false
 				} else {
-					deleteOptimized(n.parent)
+					optimizedAfterDeletion(n.parent)
 				}
 			}
 		} else {
@@ -288,7 +306,10 @@ func deleteOptimized(n *node) (parent *node) {
 			n.parent.rotateLeft()
 		}
 	} else {
-		n.parent.right = nil
+		if n.isRed == true {
+			return
+		}
+
 		sibling := n.parent.left
 
 		/* if sibling is black and it has at least one red child */
@@ -308,7 +329,7 @@ func deleteOptimized(n *node) (parent *node) {
 				if n.parent.isRed == true {
 					n.parent.isRed = false
 				} else {
-					deleteOptimized(n.parent)
+					optimizedAfterDeletion(n.parent)
 				}
 			}
 		} else {
@@ -319,7 +340,6 @@ func deleteOptimized(n *node) (parent *node) {
 			n.parent.rotateRight()
 		}
 	}
-	return
 }
 
 func (n *node) delete(key KeyType) (isDeleted bool, root *node) {
@@ -339,10 +359,13 @@ func (n *node) delete(key KeyType) (isDeleted bool, root *node) {
 		root = n
 	} else {
 		root = deleteOptimized(node)
-		for root.parent != nil {
+		for root != nil && root.parent != nil {
 			root = root.parent
 		}
 		exclude(node)
+	}
+	if root != nil && root.isRed == true {
+		root.isRed = false
 	}
 	return
 }
