@@ -12,10 +12,10 @@ import (
 	"testing"
 )
 
-func checkIntervalValue(t *testing.T, valueName string, i intervalValueType, value int64, obsolete bool) {
-	if i.value != value || i.obsolete != obsolete {
+func checkIntervalValue(t *testing.T, valueName string, i IntervalValue, value int64, obsolete bool) {
+	if i.Value != value || i.Obsolete != obsolete {
 		t.Error(fmt.Errorf("Failed for process '%s' with values: (%d, %t). Must be (%d, %t)",
-			valueName, i.value, i.obsolete, value, obsolete))
+			valueName, i.Value, i.Obsolete, value, obsolete))
 	}
 }
 
@@ -24,8 +24,8 @@ func TestParseObsoleteIntervalShort(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	checkIntervalValue(t, "notModify", i.notModify, 1234, true)
-	checkIntervalValue(t, "modify", i.modify, 654, true)
+	checkIntervalValue(t, "notModify", i.NotModify, 1234, true)
+	checkIntervalValue(t, "modify", i.Modify, 654, true)
 }
 
 func TestParseObsoleteInterval(t *testing.T) {
@@ -33,9 +33,9 @@ func TestParseObsoleteInterval(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	checkIntervalValue(t, "notModify", i.notModify, 8953, true)
-	checkIntervalValue(t, "modify", i.modify, 480, true)
-	checkIntervalValue(t, "notModifyUntil", i.notModifyUntil, 30902, true)
+	checkIntervalValue(t, "notModify", i.NotModify, 8953, true)
+	checkIntervalValue(t, "modify", i.Modify, 480, true)
+	checkIntervalValue(t, "notModifyUntil", i.NotModifyUntil, 30902, true)
 }
 
 func TestFailOnNegativeInterval(t *testing.T) {
@@ -60,9 +60,9 @@ func TestParseNotObsoleteInterval(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	checkIntervalValue(t, "notModify", i.notModify, 23, false)
-	checkIntervalValue(t, "modify", i.modify, 10, false)
-	checkIntervalValue(t, "notModifyUntil", i.notModifyUntil, 17, false)
+	checkIntervalValue(t, "notModify", i.NotModify, 23, false)
+	checkIntervalValue(t, "modify", i.Modify, 10, false)
+	checkIntervalValue(t, "notModifyUntil", i.NotModifyUntil, 17, false)
 }
 
 func TestFailToParseNotObsoleteIntervalWithInvalidValues(t *testing.T) {
@@ -87,37 +87,37 @@ func TestParseCombineInterval(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	checkIntervalValue(t, "notModify", i.notModify, 23*1024, true)
-	checkIntervalValue(t, "modify", i.modify, 96, false)
-	checkIntervalValue(t, "notModifyUntil", i.notModifyUntil, 17*1000, true)
+	checkIntervalValue(t, "notModify", i.NotModify, 23*1024, true)
+	checkIntervalValue(t, "modify", i.Modify, 96, false)
+	checkIntervalValue(t, "notModifyUntil", i.NotModifyUntil, 17*1000, true)
 
 	i, err = ParseInterval("23%%,96m,17M")
 	if err != nil {
 		t.Error(err)
 	}
-	checkIntervalValue(t, "notModify", i.notModify, 23, false)
-	checkIntervalValue(t, "modify", i.modify, 96*1000*1000, true)
-	checkIntervalValue(t, "notModifyUntil", i.notModifyUntil, 17*1024*1024, true)
+	checkIntervalValue(t, "notModify", i.NotModify, 23, false)
+	checkIntervalValue(t, "modify", i.Modify, 96*1000*1000, true)
+	checkIntervalValue(t, "notModifyUntil", i.NotModifyUntil, 17*1024*1024, true)
 
 	i, err = ParseInterval("23g,96G,17%%")
 	if err != nil {
 		t.Error(err)
 	}
-	checkIntervalValue(t, "notModify", i.notModify, 23*1000*1000*1000, true)
-	checkIntervalValue(t, "modify", i.modify, 96*1024*1024*1024, true)
-	checkIntervalValue(t, "notModifyUntil", i.notModifyUntil, 17, false)
+	checkIntervalValue(t, "notModify", i.NotModify, 23*1000*1000*1000, true)
+	checkIntervalValue(t, "modify", i.Modify, 96*1024*1024*1024, true)
+	checkIntervalValue(t, "notModifyUntil", i.NotModifyUntil, 17, false)
 }
 
 func TestGetFullInterval(t *testing.T) {
 	i := GetFullInterval()
-	checkIntervalValue(t, "notModify", i.notModify, 0, true)
-	checkIntervalValue(t, "modify", i.modify, 100, false)
-	checkIntervalValue(t, "notModifyUntil", i.notModifyUntil, 0, true)
+	checkIntervalValue(t, "notModify", i.NotModify, 0, true)
+	checkIntervalValue(t, "modify", i.Modify, 100, false)
+	checkIntervalValue(t, "notModifyUntil", i.NotModifyUntil, 0, true)
 }
 
 func TestGetEmptyInterval(t *testing.T) {
 	i := GetEmptyInterval()
-	checkIntervalValue(t, "notModify", i.notModify, 100, false)
-	checkIntervalValue(t, "modify", i.modify, 0, true)
-	checkIntervalValue(t, "notModifyUntil", i.notModifyUntil, 0, true)
+	checkIntervalValue(t, "notModify", i.NotModify, 100, false)
+	checkIntervalValue(t, "modify", i.Modify, 0, true)
+	checkIntervalValue(t, "notModifyUntil", i.NotModifyUntil, 0, true)
 }

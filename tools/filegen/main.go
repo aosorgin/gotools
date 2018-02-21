@@ -8,77 +8,79 @@ Brief:     Tool to generate files
 package main
 
 import (
-	"fmt"
+	"log"
+
 	"github.com/aosorgin/gotools/tools/filegen/fglib"
-	"os"
+	"github.com/pkg/errors"
 )
 
-func getGenerator() *fglib.Generator {
-	var gen fglib.Generator
+func getGenerator() (fglib.DataGenerator, error) {
 	if fglib.Options.GeneratorType == fglib.GeneratorCrypto {
-		gen.SetDataGenerator(new(fglib.CryptoGenerator), new(fglib.UnorderedQueue))
+		return fglib.CreateMutliThreadGenerator(fglib.CreateCryptoDataGenerator(), fglib.CreateUnorderedQueue())
 	} else if fglib.Options.GeneratorType == fglib.GeneratorPseudo {
-		var dataGen fglib.PseudoRandomGenerator
-		dataGen.Seed(fglib.Options.Seed)
-		gen.SetDataGenerator(&dataGen, new(fglib.OrderedQueue))
+		dataGen, err := fglib.CreatePseudoRandomDataGenerator(fglib.Options.Seed)
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to create pseudo-random generator")
+		}
+		return fglib.CreateMutliThreadGenerator(dataGen, fglib.CreateOrderedQueue())
 	} else if fglib.Options.GeneratorType == fglib.GeneratorNull {
-		gen.SetDataGenerator(new(fglib.NullGenerator), new(fglib.UnorderedQueue))
-	} else {
-		panic("Invalid generator type")
+		return fglib.CreateMutliThreadGenerator(fglib.CreateNullDataGenerator(), fglib.CreateUnorderedQueue())
 	}
-	return &gen
+
+	panic("Invalid generator type")
 }
 
-func generateFiles() {
-	var writer fglib.DataWriter
-
-	err := writer.Init(getGenerator())
+func generateFiles(options *fglib.CmdOptions) {
+	gen, err := getGenerator()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error: Failed to initialize generator with error", err)
-		return
+		log.Print(errors.Wrap(err, "Failed to initialize generator"))
 	}
+	filesGen := fglib.CreateLinearFileGenerator(gen, options.Path,
+		options.Generate.Folders, fglib.CreatePrefixNameGenerator("dir_"),
+		options.Generate.Files, fglib.CreatePrefixNameGenerator("file_"), options.Generate.FileSize)
+
 	defer func() {
-		err = writer.Close()
+		err = filesGen.Close()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error: Failed to close generator with error", err)
+			log.Print(errors.Wrap(err, "Failed to close generator"))
 		}
 	}()
 
-	err = writer.WriteFiles()
+	err = filesGen.Generate()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error: Failed to generate files with error", err)
+		log.Print(errors.Wrap(err, "Failed to generate files"))
 	}
 }
 
-func changeFiles() {
-	var changer fglib.Changer
-
-	err := changer.Init(getGenerator(), fglib.Options.Change.Interval, fglib.Options.Change.Once,
-		fglib.Options.Change.Reverse)
+func changeFiles(options *fglib.CmdOptions) {
+	gen, err := getGenerator()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error: Failed to initialize generator with error", err)
-		return
+		log.Print(errors.Wrap(err, "Failed to initialize generator"))
 	}
+
+	modifier := fglib.CreateFilesModifierWithInterval(gen, options.Path, options.Change.Ratio,
+		options.Change.Interval, options.Change.Once, options.Change.Reverse)
+
 	defer func() {
-		err = changer.Close()
+		err = modifier.Close()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error: Failed to close generator with error", err)
+			log.Print(errors.Wrap(err, "Failed to close generator"))
 		}
 	}()
 
-	err = changer.ModifyFiles()
+	err = modifier.Modify()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error: Failed to generate files with error", err)
+		log.Print(errors.Wrap(err, "Failed to modify files"))
 	}
 }
 
 func main() {
-	fglib.ParseCmdOptions()
+	options := fglib.ParseCmdOptions()
 	switch fglib.Options.Command {
 	case fglib.CommandGenerate:
-		generateFiles()
+		generateFiles(options)
 	case fglib.CommandChange:
-		changeFiles()
+		changeFiles(options)
 	}
 
 }

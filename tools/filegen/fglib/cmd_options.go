@@ -9,9 +9,11 @@ package fglib
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"time"
-	"io"
+
 	"github.com/go2c/optparse"
 )
 
@@ -39,10 +41,10 @@ type CmdOptions struct {
 		FileSize uint64 // File size for each tree level
 	}
 	Change struct {
-		Ratio    float64      // Change ratio
-		Interval IntervalType // Interval to change files
-		Once     bool         // Use once if true otherwise until the end of file
-		Reverse  bool         // Change file from end if true
+		Ratio    float64  // Change ratio
+		Interval Interval // Interval to change files
+		Once     bool     // Use once if true otherwise until the end of file
+		Reverse  bool     // Change file from end if true
 	}
 }
 
@@ -105,13 +107,13 @@ func processGeneratorType(genType string, seed uint64) {
 			seed = uint64(time.Now().UnixNano())
 		}
 		Options.Seed = SeedFromUint64(seed)
-		fmt.Println("Using seed:", seed)
-	} else  if genType == "null" {
+		log.Printf("Using seed: %d\n", seed)
+	} else if genType == "null" {
 		Options.GeneratorType = GeneratorNull
 		if seed != 0 {
 			fmt.Fprintf(os.Stderr, "Warning: seed is not used with null generator.\n")
 		}
-	} else 	{
+	} else {
 		fmt.Fprintf(os.Stderr, "Error: invalid generator type '%s'.\n", genType)
 		usage(os.Stderr)
 		os.Exit(1)
@@ -173,7 +175,7 @@ func usage(f io.Writer) {
 	fmt.Fprintln(f, "  -v, --version              Print version and exit")
 }
 
-func ParseCmdOptions() {
+func ParseCmdOptions() *CmdOptions {
 	/* Initializing flags for parsing command-line arguments */
 
 	/* generate command options */
@@ -217,7 +219,7 @@ func ParseCmdOptions() {
 		os.Exit(0)
 	}
 
-	if len(args) == 0{
+	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "Error: Set command to use\n")
 		usage(os.Stderr)
 		os.Exit(1)
@@ -229,4 +231,6 @@ func ParseCmdOptions() {
 	processInterval(*interval)
 	processCommand(cmd)
 	processGeneratorType(*genType, uint64(*seed))
+
+	return &Options
 }
