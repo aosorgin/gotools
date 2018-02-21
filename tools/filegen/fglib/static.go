@@ -7,30 +7,30 @@ Brief:     Static (not random) data generators implementations
 
 package fglib
 
-import (
-	"fmt"
-	"io"
-)
-
 /* Null data (consists on null values) generator implementation */
 
-type nullGeneratorReader struct {
+type nullGenerator struct { // inherits DataGenerator
 }
 
-func (gen *nullGeneratorReader) Read(block []byte) (int, error) {
-	for i, _ := range block {
+func (gen *nullGenerator) Seed(key []byte) error {
+	return ErrNotSupported
+}
+
+func (gen *nullGenerator) Read(block []byte) (int, error) {
+	for i := range block {
 		block[i] = byte(0)
 	}
 	return len(block), nil
 }
 
-type NullGenerator struct { // inherits DataGenerator
+func (gen *nullGenerator) Close() error {
+	return nil
 }
 
-func (gen *NullGenerator) Seed(key []byte) error {
-	return fmt.Errorf("Seed is not supported for null generator")
+func (gen *nullGenerator) Clone() (DataGenerator, error) {
+	return &nullGenerator{}, nil
 }
 
-func (gen *NullGenerator) GetReader() (io.Reader, error) {
-	return new(nullGeneratorReader), nil
+func CreateNullDataGenerator() DataGenerator {
+	return &nullGenerator{}
 }

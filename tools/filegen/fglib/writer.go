@@ -10,14 +10,18 @@ package fglib
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
-func writeFile(path string, size uint64, gen *Generator) {
+func writeFile(path string, size uint64, gen DataGenerator) {
 	rawFile, err := os.Create(path)
 	if err != nil {
+		log.Print(errors.Wrapf(err, "Failed for create '%s'", path))
 		return
 	}
 	defer rawFile.Close()
@@ -34,7 +38,7 @@ func writeFile(path string, size uint64, gen *Generator) {
 		}
 		_, err = gen.Read(buffer)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to write '%s'.\n", path)
+			log.Print(errors.Wrapf(err, "Failed to write to '%s'", path))
 		}
 		file.Write(buffer)
 		size -= uint64(len(buffer))
@@ -42,16 +46,15 @@ func writeFile(path string, size uint64, gen *Generator) {
 }
 
 type DataWriter struct {
-	gen *Generator
+	gen DataGenerator
 }
 
-func (w *DataWriter) Init(gen *Generator) error {
+func (w *DataWriter) Init(gen DataGenerator) {
 	w.gen = gen
-	return w.gen.Init()
 }
 
 func (w *DataWriter) Close() error {
-	return w.gen.Stop()
+	return w.gen.Close()
 }
 
 func (w *DataWriter) WriteFiles() error {
@@ -61,7 +64,7 @@ func (w *DataWriter) WriteFiles() error {
 	go func() {
 		for i := uint(0); i < Options.Generate.Folders; i++ {
 			folderPath := filepath.Join(Options.Path, fmt.Sprintf("dir%04d", i))
-			os.MkdirAll(folderPath, os.ModeDir | 0755)
+			os.MkdirAll(folderPath, os.ModeDir|0755)
 			for j := uint(0); j < Options.Generate.Files; j++ {
 				writeFile(filepath.Join(folderPath, fmt.Sprintf("file%04d", j)), Options.Generate.FileSize, w.gen)
 				filesGenerated += 1

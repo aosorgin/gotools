@@ -10,41 +10,48 @@ package fglib
 import (
 	"fmt"
 	"io"
-	"os"
+	"log"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type DataGenerator interface {
+	io.ReadCloser
+	Clone() (DataGenerator, error)
 	Seed(key []byte) error
-	GetReader() (io.Reader, error)
 }
 
 /* Queues implementations */
 
 type DataQueue interface {
-	SetChanel(dest chan []byte, maxIndex int)
-	Process(index int, data []byte)
+	SetDestination(dest chan []byte, density int)
+	ProcessBlock(index int, data []byte)
 }
 
 /* Unordered queue implementation */
 
-type UnorderedQueue struct {
+type unorderedQueue struct {
 	dest chan []byte
 }
 
-func (q *UnorderedQueue) SetChanel(dest chan []byte, maxIndex int) {
+func (q *unorderedQueue) SetDestination(dest chan []byte, density int) {
 	q.dest = dest
 }
 
-func (q *UnorderedQueue) Process(index int, data []byte) {
+func (q *unorderedQueue) ProcessBlock(index int, data []byte) {
 	q.dest <- data
+}
+
+func CreateUnorderedQueue() DataQueue {
+	return &unorderedQueue{}
 }
 
 /* Ordered queue implementation */
 
-type OrderedQueue struct {
+type orderedQueue struct {
 	dest      chan []byte
 	buffer    map[int][]byte
 	guard     sync.Mutex
@@ -52,14 +59,14 @@ type OrderedQueue struct {
 	maxIndex  int
 }
 
-func (q *OrderedQueue) SetChanel(dest chan []byte, maxIndex int) {
+func (q *orderedQueue) SetDestination(dest chan []byte, density int) {
 	q.dest = dest
 	q.buffer = make(map[int][]byte)
 	q.nextIndex = 0
-	q.maxIndex = maxIndex
+	q.maxIndex = density
 }
 
-func (q *OrderedQueue) Process(index int, data []byte) {
+func (q *orderedQueue) ProcessBlock(index int, data []byte) {
 	q.guard.Lock()
 	defer q.guard.Unlock()
 	if index != q.nextIndex {
@@ -84,9 +91,13 @@ func (q *OrderedQueue) Process(index int, data []byte) {
 	}
 }
 
+func CreateOrderedQueue() DataQueue {
+	return &orderedQueue{}
+}
+
 /* Data generator implementation */
 
-type Generator struct {
+type mutiThreadGenerator struct {
 	generator DataGenerator
 	data      chan []byte
 	queue     DataQueue
@@ -95,21 +106,22 @@ type Generator struct {
 	completed sync.WaitGroup
 }
 
-func generateRoutine(queue DataQueue, generator io.Reader, index int, stopping *bool, completed *sync.WaitGroup) {
+func generateRoutine(queue DataQueue, generator io.ReadCloser, index int, stopping *bool, completed *sync.WaitGroup) {
 	defer completed.Done()
+	defer generator.Close()
 	blockSize := 1024 * 1024
 	block := make([]byte, blockSize)
 	processCompleted := make(chan bool)
 	for {
 		read, err := generator.Read(block)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error: Failed to generate data with error", err)
+			log.Print(errors.Wrap(err, "Failed to generate data"))
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
 		go func() {
-			queue.Process(index, block[:read])
+			queue.ProcessBlock(index, block[:read])
 			processCompleted <- true
 		}()
 
@@ -134,27 +146,22 @@ func generateRoutine(queue DataQueue, generator io.Reader, index int, stopping *
 	}
 }
 
-func (gen *Generator) SetDataGenerator(generator DataGenerator, queue DataQueue) {
-	gen.generator = generator
-	gen.queue = queue
-}
-
-func (gen *Generator) Init() error {
+func (gen *mutiThreadGenerator) init() error {
 	if gen.generator == nil {
 		return fmt.Errorf("Generator is not set")
 	}
 
 	cpuCount := runtime.NumCPU()
 	gen.data = make(chan []byte, cpuCount*2)
-	gen.queue.SetChanel(gen.data, cpuCount)
+	gen.queue.SetDestination(gen.data, cpuCount)
 	gen.block = nil
 	gen.stopping = false
 
 	/* start generating goroutines */
 	for i := 0; i < cpuCount; i++ {
-		reader, err := gen.generator.GetReader()
+		reader, err := gen.generator.Clone()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Failed to clone generator")
 		}
 		gen.completed.Add(1)
 		go generateRoutine(gen.queue, reader, i, &gen.stopping, &gen.completed)
@@ -162,13 +169,17 @@ func (gen *Generator) Init() error {
 	return nil
 }
 
-func (gen *Generator) Stop() error {
+func (gen *mutiThreadGenerator) Seed(seed []byte) error {
+	return ErrNotSupported
+}
+
+func (gen *mutiThreadGenerator) Close() error {
 	gen.stopping = true
 	gen.completed.Wait()
 	return nil
 }
 
-func (gen *Generator) Read(p []byte) (int, error) {
+func (gen *mutiThreadGenerator) Read(p []byte) (int, error) {
 	offset := 0
 	size := len(p)
 	for size > 0 {
@@ -191,4 +202,20 @@ func (gen *Generator) Read(p []byte) (int, error) {
 	}
 
 	return size, nil
+}
+
+func (gen *mutiThreadGenerator) Clone() (DataGenerator, error) {
+	return nil, ErrNotSupported
+}
+
+func CreateMutliThreadGenerator(generator DataGenerator, queue DataQueue) (DataGenerator, error) {
+	gen := &mutiThreadGenerator{
+		generator: generator,
+		queue:     queue,
+	}
+	err := gen.init()
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create multi-thread data generator")
+	}
+	return gen, nil
 }

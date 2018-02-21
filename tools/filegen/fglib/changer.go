@@ -17,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 /* Interval tools */
@@ -69,7 +71,7 @@ func getObsoleteInterval(interval IntervalType, size int64) IntervalType {
 func ParseInterval(data string) (result IntervalType, err error) {
 	intervals := strings.Split(data, ",")
 	if len(intervals) < 2 || len(intervals) > 3 {
-		err = fmt.Errorf("Invalid interval format. Must be 2 values at least but not more than 3.")
+		err = fmt.Errorf("Invalid interval format. Must be 2 values at least but not more than 3")
 		return
 	}
 
@@ -81,10 +83,10 @@ func ParseInterval(data string) (result IntervalType, err error) {
 		i.obsolete = true
 		value, err := strconv.Atoi(r[1])
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Failed to convert string '%s' to integer", r[1])
 		}
 		if value < 0 {
-			return fmt.Errorf("Invalid interval format for '%s'. Must be positive.", serialized)
+			return fmt.Errorf("Invalid interval format for '%s'. Must be positive", serialized)
 		}
 		i.value = int64(value)
 
@@ -92,7 +94,7 @@ func ParseInterval(data string) (result IntervalType, err error) {
 		case "%":
 			i.obsolete = false
 			if i.value > 100 {
-				return fmt.Errorf("Invalid interval format for '%s'. Must be in [0;100].", serialized)
+				return fmt.Errorf("Invalid interval format for '%s'. Must be in [0;100]", serialized)
 			}
 		case "k":
 			i.value *= 1000
@@ -142,7 +144,7 @@ func ParseSize(rawSize string) (uint64, error) {
 
 	size, err := strconv.ParseInt(r[1], 10, 0)
 	if err != nil {
-		return uint64(0), err
+		return uint64(0), errors.Wrapf(err, "Failed to parse integer '%s'", r[1])
 	}
 
 	switch r[2] {
@@ -169,11 +171,11 @@ func ParseSize(rawSize string) (uint64, error) {
 /* Get random subset in sequence mode */
 
 type SequenceChecker interface {
-	Check() (bool, error)
+	IsFileIsSelected() (bool, error)
 }
 
-type RandomSubSet struct { // implements SequenceChecker
-	gen      *Generator
+type randomSubSet struct { // implements SequenceChecker
+	gen      DataGenerator
 	weight   float64
 	hitScore float64
 	length   uint64
@@ -182,7 +184,7 @@ type RandomSubSet struct { // implements SequenceChecker
 	hits     uint64
 }
 
-func (r *RandomSubSet) Init(gen *Generator, count uint64, length uint64) error {
+func (r *randomSubSet) init(gen DataGenerator, count uint64, length uint64) error {
 	if length == 0 {
 		return fmt.Errorf("length argument cannot be 0")
 	}
@@ -199,7 +201,7 @@ func (r *RandomSubSet) Init(gen *Generator, count uint64, length uint64) error {
 	return nil
 }
 
-func (r *RandomSubSet) Check() (bool, error) {
+func (r *randomSubSet) IsFileIsSelected() (bool, error) {
 	if r.hits >= r.count || r.index >= r.length {
 		return false, nil
 	}
@@ -213,7 +215,7 @@ func (r *RandomSubSet) Check() (bool, error) {
 
 	v, err := r.getFloat64()
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(err, "Failed to get random float")
 	}
 
 	r.index++
@@ -225,44 +227,43 @@ func (r *RandomSubSet) Check() (bool, error) {
 	return false, nil
 }
 
-func (r *RandomSubSet) getFloat64() (float64, error) {
+func (r *randomSubSet) getFloat64() (float64, error) {
 	var v uint64
 	err := binary.Read(r.gen, binary.LittleEndian, &v)
 	if err != nil {
-		return float64(0), err
+		return float64(0), errors.Wrap(err, "Failed toread float value from data generator")
 	}
 	return (float64(v) / float64(^uint64(0))), nil
 }
 
 /* Simple checker that returns always true */
 
-type AlwaysTrueChecker struct {
+type alwaysTrueChecker struct {
 }
 
-func (r *AlwaysTrueChecker) Check() (bool, error) {
+func (r *alwaysTrueChecker) IsFileIsSelected() (bool, error) {
 	return true, nil
 }
 
 /* Changer implementation */
 
 type Changer struct {
-	gen *Generator // data generator
+	gen DataGenerator
 
 	interval IntervalType
 	once     bool // use once if true otherwise until file ending
 	reverse  bool // use interval from the end of file if true
 }
 
-func (c *Changer) Init(gen *Generator, interval IntervalType, once bool, reverse bool) error {
+func (c *Changer) Init(gen DataGenerator, interval IntervalType, once bool, reverse bool) {
 	c.gen = gen
 	c.interval = interval
 	c.once = once
 	c.reverse = reverse
-	return c.gen.Init()
 }
 
 func (c *Changer) Close() error {
-	return c.gen.Stop()
+	return c.gen.Close()
 }
 
 func min(a int64, b int64) int64 {
@@ -280,7 +281,7 @@ func changeFile(path string, info os.FileInfo, c *Changer) error {
 
 	file, err := os.OpenFile(path, os.O_RDWR, 0755)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to open file '%s'", path)
 	}
 	defer file.Close()
 
@@ -298,13 +299,22 @@ func changeFile(path string, info os.FileInfo, c *Changer) error {
 		if c.reverse == true || new_offset != offset {
 			if c.reverse == true {
 				if (size - new_offset) < i.modify.value {
-					file.Seek(0, io.SeekStart)
+					_, err := file.Seek(0, io.SeekStart)
+					if err != nil {
+						return errors.Wrap(err, "Failed to seek")
+					}
 				} else {
-					file.Seek(size-new_offset-i.modify.value, io.SeekStart)
+					_, err := file.Seek(size-new_offset-i.modify.value, io.SeekStart)
+					if err != nil {
+						return errors.Wrap(err, "Failed to seek")
+					}
 				}
 				write_size = min(size-new_offset, i.modify.value)
 			} else {
-				file.Seek(new_offset, io.SeekStart)
+				_, err := file.Seek(new_offset, io.SeekStart)
+				if err != nil {
+					return errors.Wrap(err, "Failed to seek")
+				}
 				write_size = min(i.modify.value, size-new_offset)
 			}
 			offset = new_offset
@@ -316,7 +326,7 @@ func changeFile(path string, info os.FileInfo, c *Changer) error {
 		new_offset += writen
 		offset = new_offset
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Failed to copy data from data generator")
 		}
 
 		if c.once == true {
@@ -355,16 +365,16 @@ func (c *Changer) ModifyFiles() error {
 		var err error
 		totalFiles, err = getFilesCount(Options.Path)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Failed to get files count")
 		}
-		r := new(RandomSubSet)
-		r.Init(c.gen, uint64(Options.Change.Ratio*float64(totalFiles)), uint64(totalFiles))
+		r := new(randomSubSet)
+		r.init(c.gen, uint64(Options.Change.Ratio*float64(totalFiles)), uint64(totalFiles))
 		fileSelector = r
 	} else {
 		go func() {
 			totalFiles, _ = getFilesCount(Options.Path)
 		}()
-		fileSelector = new(AlwaysTrueChecker)
+		fileSelector = new(alwaysTrueChecker)
 	}
 
 	go func() {
@@ -372,9 +382,9 @@ func (c *Changer) ModifyFiles() error {
 			if info.IsDir() {
 				return nil
 			}
-			r, err := fileSelector.Check()
+			r, err := fileSelector.IsFileIsSelected()
 			if err != nil {
-				return err
+				return errors.Wrap(err, "Failed to check if file is selected to change")
 			}
 			if r == true {
 				err = changeFile(path, info, c)

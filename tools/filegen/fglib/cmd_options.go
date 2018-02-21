@@ -9,9 +9,11 @@ package fglib
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"time"
-	"io"
+
 	"github.com/go2c/optparse"
 )
 
@@ -105,13 +107,13 @@ func processGeneratorType(genType string, seed uint64) {
 			seed = uint64(time.Now().UnixNano())
 		}
 		Options.Seed = SeedFromUint64(seed)
-		fmt.Println("Using seed:", seed)
-	} else  if genType == "null" {
+		log.Printf("Using seed: %d\n", seed)
+	} else if genType == "null" {
 		Options.GeneratorType = GeneratorNull
 		if seed != 0 {
 			fmt.Fprintf(os.Stderr, "Warning: seed is not used with null generator.\n")
 		}
-	} else 	{
+	} else {
 		fmt.Fprintf(os.Stderr, "Error: invalid generator type '%s'.\n", genType)
 		usage(os.Stderr)
 		os.Exit(1)
@@ -217,7 +219,7 @@ func ParseCmdOptions() {
 		os.Exit(0)
 	}
 
-	if len(args) == 0{
+	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "Error: Set command to use\n")
 		usage(os.Stderr)
 		os.Exit(1)
