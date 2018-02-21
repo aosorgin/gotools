@@ -53,24 +53,22 @@ func generateFiles(options *fglib.CmdOptions) {
 }
 
 func changeFiles(options *fglib.CmdOptions) {
-	var changer fglib.Changer
-
 	gen, err := getGenerator()
 	if err != nil {
 		log.Print(errors.Wrap(err, "Failed to initialize generator"))
 	}
 
-	changer.Init(gen, options.Change.Interval, options.Change.Once,
-		options.Change.Reverse)
+	modifier := fglib.CreateFilesModifierWithInterval(gen, options.Path, options.Change.Ratio,
+		options.Change.Interval, options.Change.Once, options.Change.Reverse)
 
 	defer func() {
-		err = changer.Close()
+		err = modifier.Close()
 		if err != nil {
 			log.Print(errors.Wrap(err, "Failed to close generator"))
 		}
 	}()
 
-	err = changer.ModifyFiles()
+	err = modifier.Modify()
 	if err != nil {
 		log.Print(errors.Wrap(err, "Failed to modify files"))
 	}

@@ -41,10 +41,10 @@ type CmdOptions struct {
 		FileSize uint64 // File size for each tree level
 	}
 	Change struct {
-		Ratio    float64      // Change ratio
-		Interval IntervalType // Interval to change files
-		Once     bool         // Use once if true otherwise until the end of file
-		Reverse  bool         // Change file from end if true
+		Ratio    float64  // Change ratio
+		Interval Interval // Interval to change files
+		Once     bool     // Use once if true otherwise until the end of file
+		Reverse  bool     // Change file from end if true
 	}
 }
 
