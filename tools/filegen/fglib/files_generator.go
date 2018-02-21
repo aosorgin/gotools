@@ -96,8 +96,8 @@ func (g *linearFilesGenerator) Generate() error {
 			}
 			folderPath := filepath.Join(g.path, dirName)
 			os.MkdirAll(folderPath, os.ModeDir|0755)
-			for j := uint(0); j < Options.Generate.Files; j++ {
-				fileName, err := g.fileNames.GetName(i)
+			for j := uint(0); j < g.filesCount; j++ {
+				fileName, err := g.fileNames.GetName(j)
 				if err != nil {
 					errorChannel <- errors.Wrap(err, "Failed to generate file name")
 				}

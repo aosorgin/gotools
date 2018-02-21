@@ -175,7 +175,7 @@ func usage(f io.Writer) {
 	fmt.Fprintln(f, "  -v, --version              Print version and exit")
 }
 
-func ParseCmdOptions() {
+func ParseCmdOptions() *CmdOptions {
 	/* Initializing flags for parsing command-line arguments */
 
 	/* generate command options */
@@ -231,4 +231,6 @@ func ParseCmdOptions() {
 	processInterval(*interval)
 	processCommand(cmd)
 	processGeneratorType(*genType, uint64(*seed))
+
+	return &Options
 }

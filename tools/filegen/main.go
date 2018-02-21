@@ -30,29 +30,29 @@ func getGenerator() (fglib.DataGenerator, error) {
 	panic("Invalid generator type")
 }
 
-func generateFiles() {
-	var writer fglib.DataWriter
-
+func generateFiles(options *fglib.CmdOptions) {
 	gen, err := getGenerator()
 	if err != nil {
 		log.Print(errors.Wrap(err, "Failed to initialize generator"))
 	}
-	writer.Init(gen)
+	filesGen := fglib.CreateLinearFileGenerator(gen, options.Path,
+		options.Generate.Folders, fglib.CreatePrefixNameGenerator("dir_"),
+		options.Generate.Files, fglib.CreatePrefixNameGenerator("file_"), options.Generate.FileSize)
 
 	defer func() {
-		err = writer.Close()
+		err = filesGen.Close()
 		if err != nil {
 			log.Print(errors.Wrap(err, "Failed to close generator"))
 		}
 	}()
 
-	err = writer.WriteFiles()
+	err = filesGen.Generate()
 	if err != nil {
 		log.Print(errors.Wrap(err, "Failed to generate files"))
 	}
 }
 
-func changeFiles() {
+func changeFiles(options *fglib.CmdOptions) {
 	var changer fglib.Changer
 
 	gen, err := getGenerator()
@@ -60,8 +60,8 @@ func changeFiles() {
 		log.Print(errors.Wrap(err, "Failed to initialize generator"))
 	}
 
-	changer.Init(gen, fglib.Options.Change.Interval, fglib.Options.Change.Once,
-		fglib.Options.Change.Reverse)
+	changer.Init(gen, options.Change.Interval, options.Change.Once,
+		options.Change.Reverse)
 
 	defer func() {
 		err = changer.Close()
@@ -77,12 +77,12 @@ func changeFiles() {
 }
 
 func main() {
-	fglib.ParseCmdOptions()
+	options := fglib.ParseCmdOptions()
 	switch fglib.Options.Command {
 	case fglib.CommandGenerate:
-		generateFiles()
+		generateFiles(options)
 	case fglib.CommandChange:
-		changeFiles()
+		changeFiles(options)
 	}
 
 }
