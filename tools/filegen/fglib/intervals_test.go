@@ -66,19 +66,43 @@ func TestParseNotObsoleteInterval(t *testing.T) {
 }
 
 func TestFailToParseNotObsoleteIntervalWithInvalidValues(t *testing.T) {
-	_, err := ParseInterval("8953%%,80%%,3%%")
-	if err == nil {
-		t.Error(fmt.Errorf("Successfully parse more then 100%% interval"))
+	i, err := ParseInterval("8953%%,80%%,3%%")
+	if err != nil {
+		t.Error(err)
 	}
 
-	_, err = ParseInterval("89%%,840%%,3%%")
-	if err == nil {
-		t.Error(fmt.Errorf("Successfully parse more then 100%% interval"))
+	if _, err = i.GetObsolete(int64(100), true); err == nil {
+		t.Error(fmt.Errorf("Successfully get obsolete with more then 100%% interval"))
 	}
 
-	_, err = ParseInterval("89%%,40%%,378%%")
-	if err == nil {
-		t.Error(fmt.Errorf("Successfully parse more then 100%% interval"))
+	if _, err = i.GetObsolete(int64(100), false); err != nil {
+		t.Error(err)
+	}
+
+	i, err = ParseInterval("89%%,840%%,3%%")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if _, err = i.GetObsolete(int64(100), true); err == nil {
+		t.Error(fmt.Errorf("Successfully get obsolete with more then 100%% interval"))
+	}
+
+	if _, err = i.GetObsolete(int64(100), false); err != nil {
+		t.Error(err)
+	}
+
+	i, err = ParseInterval("89%%,40%%,378%%")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if _, err = i.GetObsolete(int64(100), true); err == nil {
+		t.Error(fmt.Errorf("Successfully get obsolete with more then 100%% interval"))
+	}
+
+	if _, err = i.GetObsolete(int64(100), false); err != nil {
+		t.Error(err)
 	}
 }
 

@@ -45,6 +45,7 @@ type CmdOptions struct {
 		Interval Interval // Interval to change files
 		Once     bool     // Use once if true otherwise until the end of file
 		Reverse  bool     // Change file from end if true
+		Append   bool     // Append file
 	}
 
 	GenerateInMultipleThread bool // If generate data in multiple threads all data could be placed on disk with fragmentation
@@ -58,6 +59,7 @@ func processFileSize(rawSize string) {
 	Options.Generate.FileSize, err = ParseSize(rawSize)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		usage(os.Stderr)
 		os.Exit(1)
 	}
 }
@@ -70,10 +72,12 @@ func processInterval(interval string) {
 		Options.Change.Interval, err = ParseInterval(interval)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
+			usage(os.Stderr)
 			os.Exit(1)
 		}
 	}
 }
+
 func processCommonCommand() {
 	/* Check options */
 
@@ -93,6 +97,14 @@ func processGenerateCommand() {
 
 	if Options.Generate.Files == 0 {
 		fmt.Fprintf(os.Stderr, "Error: Use the --files option to set files count to generate.\n")
+		usage(os.Stderr)
+		os.Exit(1)
+	}
+}
+
+func processChangeCommand() {
+	if Options.Change.Append && Options.Change.Reverse {
+		fmt.Fprintf(os.Stderr, "Error: Option --reverse cannot be used with --append option.\n")
 		usage(os.Stderr)
 		os.Exit(1)
 	}
@@ -136,6 +148,7 @@ func processCommand(cmd string) {
 	} else if cmd == "chg" || cmd == "change" {
 		Options.Command = CommandChange
 		processCommonCommand()
+		processChangeCommand()
 	} else {
 		fmt.Fprintf(os.Stderr, "Error: Invalid command '%s'\n", cmd)
 		usage(os.Stderr)
@@ -169,6 +182,7 @@ func usage(f io.Writer) {
 	fmt.Fprintln(f, "                             Data format: [\\d{%,k,K,m,M,g,G}]. By default is [0,100%] and used until file ending")
 	fmt.Fprintln(f, "  --once                     Using of interval only once. Used only with -i, --interval option.")
 	fmt.Fprintln(f, "  --reverse                  Using interval from the file ending to begining. Used only with -i, --interval option.")
+	fmt.Fprintln(f, "  --append                   Using interval to append data to file. Used only with -i, --interval option.")
 	fmt.Fprintln(f)
 
 	fmt.Fprintln(f, "Generator options:")
@@ -198,6 +212,7 @@ func ParseCmdOptions() *CmdOptions {
 	optparse.FloatVar(&Options.Change.Ratio, "scale", 0, float64(1))
 	optparse.BoolVar(&Options.Change.Once, "once", 0, false)
 	optparse.BoolVar(&Options.Change.Reverse, "reverse", 0, false)
+	optparse.BoolVar(&Options.Change.Append, "append", 0, false)
 	interval := optparse.String("interval", 'i', "")
 
 	/* common options */

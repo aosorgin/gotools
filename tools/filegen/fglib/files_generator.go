@@ -20,6 +20,18 @@ import (
 	"github.com/pkg/errors"
 )
 
+func generateToFile(file *os.File, gen DataGenerator, size int64) (int64, error) {
+	bufFile := bufio.NewWriter(file)
+	defer bufFile.Flush()
+
+	writen, err := io.CopyN(bufFile, gen, size)
+	if err != nil {
+		return writen, errors.Wrap(err, "Failed to generate data to file")
+	}
+
+	return writen, nil
+}
+
 func writeFile(path string, size uint64, gen DataGenerator) error {
 	rawFile, err := os.Create(path)
 	if err != nil {
@@ -27,23 +39,10 @@ func writeFile(path string, size uint64, gen DataGenerator) error {
 	}
 	defer rawFile.Close()
 
-	file := bufio.NewWriter(rawFile)
-	defer file.Flush()
-
-	var bufferSize uint64 = 64 * 1024
-	buffer := make([]byte, bufferSize)
-
-	for size > 0 {
-		if size < bufferSize {
-			buffer = buffer[:size]
-		}
-		_, err = gen.Read(buffer)
-		if err != nil {
-			return errors.Wrapf(err, "Failed to write to '%s'", path)
-		}
-		file.Write(buffer)
-		size -= uint64(len(buffer))
+	if _, err = generateToFile(rawFile, gen, int64(size)); err != nil {
+		return errors.Wrapf(err, "Failed to write to '%s'", path)
 	}
+
 	return nil
 }
 

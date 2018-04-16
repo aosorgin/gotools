@@ -91,6 +91,7 @@ Change command options:
                              Data format: [\d{%, k,K,m,M,g,G}]. By default is [0,100%] and used until file ending
   --once                     Using of interval only once. Used only with -i, --interval option.
   --reverse                  Using interval from the file ending to begining. Used only with -i, --interval option.
+  --append                   Using interval to append data to file. Used only with -i, --interval option.
 
 Generator options:
   -g, --generator            Type of generator to use
@@ -112,10 +113,18 @@ Each value in interval could be:
 To use intervals option **-i**, **--interval** is used. By default interval is (0, 100%).
 
 There are special options for intervals:
-  * **--once** used to apply interval once. In other case interval will be used until the end of file
+  * **--once** used to apply interval once. In other case interval will be used until the end of file.
   * **--reverse** used to apply interval from the end of file.
+  * **--append** used to append data to file. This mode is connot be used with *--reverse* option.
 
-*Examples:*
+#### **--append** mode
+
+In this mode interval is used the next way:
+  - First value means position to start generate data. It could be more than file size. In this case space between old data and new write position will be filled with nulls.
+  - Second value means how many data to generate to file.
+
+
+#### Examples
 
 Modify first 20% of file's data:
 ```

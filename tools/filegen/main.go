@@ -61,7 +61,7 @@ func changeFiles(options *fglib.CmdOptions) {
 
 	modifier := fglib.CreateFilesModifierWithInterval(gen, options.Path, options.GenerateInMultipleThread,
 		options.Change.Ratio, options.Change.Interval, options.Change.Once, options.Change.Reverse,
-		options.QuietMode)
+		options.Change.Append, options.QuietMode)
 
 	defer func() {
 		err = modifier.Close()

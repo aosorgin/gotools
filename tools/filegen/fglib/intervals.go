@@ -46,18 +46,33 @@ func GetEmptyInterval() Interval {
 	}
 }
 
-func GetObsoleteInterval(interval Interval, size int64) Interval {
-	result := interval
-	makeObsolete := func(v *IntervalValue) {
+func (i Interval) GetObsolete(size int64, checkNotIncreasing bool) (Interval, error) {
+	result := i
+	makeObsolete := func(v *IntervalValue) error {
 		if v.Obsolete == false {
+			if checkNotIncreasing && v.Value > 100 {
+				return errors.New("Interval value is more than 100%")
+			}
 			v.Value = int64(float64(v.Value*size) / float64(100))
 			v.Obsolete = true
 		}
+
+		return nil
 	}
-	makeObsolete(&result.NotModify)
-	makeObsolete(&result.Modify)
-	makeObsolete(&result.NotModifyUntil)
-	return result
+
+	if err := makeObsolete(&result.NotModify); err != nil {
+		return Interval{}, err
+	}
+
+	if err := makeObsolete(&result.Modify); err != nil {
+		return Interval{}, err
+	}
+
+	if err := makeObsolete(&result.NotModifyUntil); err != nil {
+		return Interval{}, err
+	}
+
+	return result, nil
 }
 
 // Interval format [digit{,kK,mM,gG,%},*3]. First value to seek without modification.
@@ -88,9 +103,6 @@ func ParseInterval(data string) (result Interval, err error) {
 		switch r[2] {
 		case "%":
 			i.Obsolete = false
-			if i.Value > 100 {
-				return fmt.Errorf("Invalid interval format for '%s'. Must be in [0;100]", serialized)
-			}
 		case "k":
 			i.Value *= 1000
 		case "K":

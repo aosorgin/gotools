@@ -72,7 +72,7 @@ func (r *randomFileSelector) getFloat64() (float64, error) {
 	return (float64(v) / float64(^uint64(0))), nil
 }
 
-func CreateRundomFileSelector(gen DataGenerator, count uint64, total uint64) (FileSelector, error) {
+func CreateRandomFileSelector(gen DataGenerator, count uint64, total uint64) (FileSelector, error) {
 	if total == 0 {
 		return nil, fmt.Errorf("total argument cannot be 0")
 	}
@@ -121,6 +121,7 @@ type modifyFilesWithIntervals struct {
 	interval Interval
 	once     bool // use once if true otherwise until file ending
 	reverse  bool // use interval from the end of file if true
+	append   bool // use interval to append data to file
 }
 
 func (m *modifyFilesWithIntervals) Close() error {
@@ -134,8 +135,25 @@ func min(a int64, b int64) int64 {
 	return b
 }
 
+func (m *modifyFilesWithIntervals) appendFile(file *os.File, i *Interval) error {
+	_, err := file.Seek(i.NotModify.Value, io.SeekStart)
+	if err != nil {
+		return errors.Wrap(err, "Failed to seek")
+	}
+
+	if _, err = generateToFile(file, m.gen, i.Modify.Value); err != nil {
+		return errors.Wrap(err, "Failed to generate data to file")
+	}
+
+	return nil
+}
+
 func (m *modifyFilesWithIntervals) changeFile(path string, info os.FileInfo) error {
-	i := GetObsoleteInterval(m.interval, info.Size())
+	i, err := m.interval.GetObsolete(info.Size(), false)
+	if err != nil {
+		return errors.Wrap(err, "Failed to get obsolete interval")
+	}
+
 	if i.Modify.Value == 0 {
 		return nil
 	}
@@ -145,6 +163,17 @@ func (m *modifyFilesWithIntervals) changeFile(path string, info os.FileInfo) err
 		return errors.Wrapf(err, "Failed to open file '%s'", path)
 	}
 	defer file.Close()
+
+	if m.append {
+		if err = m.appendFile(file, &i); err != nil {
+			return errors.Wrapf(err, "Failed to append file '%s'", path)
+		}
+		return nil
+	}
+
+	if i, err = m.interval.GetObsolete(info.Size(), true); err != nil {
+		return errors.Wrap(err, "Failed to get obsolete interval")
+	}
 
 	size := info.Size()
 	writeSize := int64(0)
@@ -183,7 +212,7 @@ func (m *modifyFilesWithIntervals) changeFile(path string, info os.FileInfo) err
 			writeSize = min(i.Modify.Value, size-newOffset)
 		}
 
-		writen, err := io.CopyN(file, m.gen, writeSize)
+		writen, err := generateToFile(file, m.gen, writeSize)
 		newOffset += writen
 		offset = newOffset
 		if err != nil {
@@ -224,7 +253,7 @@ func (m *modifyFilesWithIntervals) Modify() error {
 	log.Printf("write in the single thread: %t", m.generateInMultipleThreads == false)
 
 	completeSignal := make(chan bool)
-	errorChannel := make(chan error)
+	errorChannel := make(chan error, 2) // Buffered channel is used to allow complete all gorotines with errors
 	filesProcessed := 0
 	failed := false
 	var totalFiles int64
@@ -237,23 +266,26 @@ func (m *modifyFilesWithIntervals) Modify() error {
 		if err != nil {
 			return errors.Wrap(err, "Failed to get files count")
 		}
-		fileSelector, err = CreateRundomFileSelector(m.gen, uint64(m.changeRatio*float64(totalFiles)), uint64(totalFiles))
+		fileSelector, err = CreateRandomFileSelector(m.gen, uint64(m.changeRatio*float64(totalFiles)), uint64(totalFiles))
 		if err != nil {
-			return errors.Wrap(err, "Failed to create rundom file selector")
+			return errors.Wrap(err, "Failed to create random file selector")
 		}
 	} else {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			var err error
 			totalFiles, err = m.getFilesCount()
 			if err != nil {
 				errorChannel <- errors.Wrap(err, "Failed to get files count")
 			}
 		}()
-		wg.Add(1)
 		fileSelector = CreateAllFilesSelector()
 	}
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if m.generateInMultipleThreads == false {
 			// Attach goroutine to the single thread to wrile files on disk with no fragmentation
 			runtime.LockOSThread()
@@ -290,7 +322,6 @@ func (m *modifyFilesWithIntervals) Modify() error {
 		}
 		completeSignal <- true
 	}()
-	wg.Add(1)
 
 	report := func() {
 		if totalFiles == 0 {
@@ -321,7 +352,7 @@ func (m *modifyFilesWithIntervals) Modify() error {
 }
 
 func CreateFilesModifierWithInterval(gen DataGenerator, path string, generateInMultipleThreads bool,
-	changeRatio float64, interval Interval, once, reverse bool, quietMode bool) FilesModifier {
+	changeRatio float64, interval Interval, once, reverse, append bool, quietMode bool) FilesModifier {
 	return &modifyFilesWithIntervals{
 		gen:  gen,
 		path: path,
@@ -330,6 +361,7 @@ func CreateFilesModifierWithInterval(gen DataGenerator, path string, generateInM
 		changeRatio:               changeRatio,
 		interval:                  interval,
 		once:                      once,
+		append:                    append,
 		reverse:                   reverse,
 	}
 }
