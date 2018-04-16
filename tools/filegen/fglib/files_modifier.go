@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -219,6 +220,9 @@ func (m *modifyFilesWithIntervals) getFilesCount() (filesCount int64, err error)
 }
 
 func (m *modifyFilesWithIntervals) Modify() error {
+	log.Print("Files modification is started")
+	log.Printf("write in the single thread: %t", m.generateInMultipleThreads == false)
+
 	completeSignal := make(chan bool)
 	errorChannel := make(chan error)
 	filesProcessed := 0
@@ -306,6 +310,7 @@ func (m *modifyFilesWithIntervals) Modify() error {
 		case <-completeSignal:
 			report()
 			fmt.Println("")
+			log.Print("Files modification has completed successfully")
 			return nil
 		case err := <-errorChannel:
 			failed = true

@@ -11,6 +11,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -86,6 +87,9 @@ func (g *linearFilesGenerator) Close() error {
 }
 
 func (g *linearFilesGenerator) Generate() error {
+	log.Print("Files generation is started")
+	log.Printf("directories: %d, files: %d, file size: %d", g.dirsCount, g.filesCount, g.fileSize)
+	log.Printf("write in the single thread: %t", g.generateInMultipleThreads == false)
 	completeSignal := make(chan bool)
 	errorChannel := make(chan error)
 	filesGenerated := 0
@@ -131,6 +135,7 @@ func (g *linearFilesGenerator) Generate() error {
 			}
 		case <-completeSignal:
 			fmt.Printf("\rGenerated: (%d/%d)        \n", filesGenerated, filesTotal)
+			log.Print("Generation has completed successfully")
 			return nil
 		case err := <-errorChannel:
 			return errors.Wrapf(err, "Failed to generate files")
