@@ -40,6 +40,8 @@ Generator options:
      pseudo                  Pseudo random data generator
      null                    Null contains data generator
   --seed                     Initial seed for generated data. Can be used only with 'pseudo' generator
+  --multiple-thread          Generate files with multiple threads. This mean than generated files can be fragmented
+                             on disk. Can't be used with 'pseudo' generator
 ```
 
 *-s, --size* option supports the following endings:
@@ -64,6 +66,10 @@ This generator is not cryptographically strong pseudo-random generator but it su
 #### **null** blocks generator
 
 This generator creates static blocks with nulls  
+
+#### Generation data with multiple threads
+
+This mode allow write files to disk in multiple threads. This means that writen files can be fragmented on disk. Each block is writen on disk in the thread that goroutines scheduler has selected. Option **--multiple-threads** is used for this. By default all files is writen in the single thread.
 
 ## Modify existing files
 
@@ -90,6 +96,8 @@ Generator options:
      pseudo                  Pseudo random data generator
      null                    Null contains data generator
   --seed                     Initial seed for generated data. Can be used only with 'pseudo' generator
+  --multiple-thread          Generate files with multiple threads. This mean than generated files can be fragmented
+                             on disk. Can't be used with 'pseudo' generator
 ```
 
 ### Intervals
@@ -107,12 +115,12 @@ There are special options for intervals:
 
 *Examples:*
 
-Modify first 20% of file:
+Modify first 20% of file's data:
 ```
 -i 0,20% --once
 ```
 
-Modify 20% of files with 1M gap from the end:
+Modify each 20% of file's data with 1M gap from the end to the begining:
 ```
 -i 0,20%,1M --reverse
 ```

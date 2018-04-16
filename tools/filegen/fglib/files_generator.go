@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/pkg/errors"
@@ -67,8 +68,9 @@ type FilesGenerator interface {
 }
 
 type linearFilesGenerator struct {
-	gen  DataGenerator
-	path string
+	gen                       DataGenerator
+	path                      string
+	generateInMultipleThreads bool
 
 	dirsCount uint
 	dirNames  NameGenerator
@@ -88,6 +90,12 @@ func (g *linearFilesGenerator) Generate() error {
 	filesGenerated := 0
 
 	go func() {
+		if g.generateInMultipleThreads == false {
+			// Attach goroutine to the single thread to wrile files on disk with no fragmentation
+			runtime.LockOSThread()
+			defer runtime.UnlockOSThread()
+		}
+
 		for i := uint(0); i < g.dirsCount; i++ {
 			dirName, err := g.dirNames.GetName(i)
 			if err != nil {
@@ -127,15 +135,17 @@ func (g *linearFilesGenerator) Generate() error {
 	}
 }
 
-func CreateLinearFileGenerator(gen DataGenerator, path string, dirsCount uint, dirNames NameGenerator,
+func CreateLinearFileGenerator(gen DataGenerator, path string, generateInMultipleThreads bool,
+	dirsCount uint, dirNames NameGenerator,
 	filesCount uint, fileNames NameGenerator, fileSize uint64) FilesGenerator {
 	return &linearFilesGenerator{
-		gen:        gen,
-		path:       path,
-		dirsCount:  dirsCount,
-		dirNames:   dirNames,
-		filesCount: filesCount,
-		fileNames:  fileNames,
-		fileSize:   fileSize,
+		gen:  gen,
+		path: path,
+		generateInMultipleThreads: generateInMultipleThreads,
+		dirsCount:                 dirsCount,
+		dirNames:                  dirNames,
+		filesCount:                filesCount,
+		fileNames:                 fileNames,
+		fileSize:                  fileSize,
 	}
 }

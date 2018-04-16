@@ -46,6 +46,8 @@ type CmdOptions struct {
 		Once     bool     // Use once if true otherwise until the end of file
 		Reverse  bool     // Change file from end if true
 	}
+
+	GenerateInMultipleThread bool // If generate data in multiple threads all data could be placed on disk with fragmentation
 }
 
 var Options CmdOptions
@@ -102,6 +104,11 @@ func processGeneratorType(genType string, seed uint64) {
 			fmt.Fprintf(os.Stderr, "Warning: seed is not used with crypto generator.\n")
 		}
 	} else if genType == "pseudo" {
+		if Options.GenerateInMultipleThread {
+			fmt.Fprintf(os.Stderr, "Error: Usage of the --multiple-thread option with 'pseudo' generator is prohibit.\n")
+			usage(os.Stderr)
+			os.Exit(1)
+		}
 		Options.GeneratorType = GeneratorPseudo
 		if seed == 0 {
 			seed = uint64(time.Now().UnixNano())
@@ -157,7 +164,7 @@ func usage(f io.Writer) {
 	fmt.Fprintln(f, "Change command options:")
 	fmt.Fprintln(f, "  --scale                    Percent of files cont to change. Range: [0;1]. By default is equal to 1")
 	fmt.Fprintln(f, "  -i, --interval             Interval to change file with. Format: ['data not to change', 'data to change',{'data not to change'}].")
-	fmt.Fprintln(f, "                             Data format: [\\d{%, k,K,m,M,g,G}]. By default is [0,100%] and used until file ending")
+	fmt.Fprintln(f, "                             Data format: [\\d{%,k,K,m,M,g,G}]. By default is [0,100%] and used until file ending")
 	fmt.Fprintln(f, "  --once                     Using of interval only once. Used only with -i, --interval option.")
 	fmt.Fprintln(f, "  --reverse                  Using interval from the file ending to begining. Used only with -i, --interval option.")
 	fmt.Fprintln(f)
@@ -168,6 +175,8 @@ func usage(f io.Writer) {
 	fmt.Fprintln(f, "     pseudo                  Pseudo random data generator")
 	fmt.Fprintln(f, "     null                    Null contains data generator")
 	fmt.Fprintln(f, "  --seed                     Initial seed for generated data. Can be used only with 'pseudo' generator")
+	fmt.Fprintln(f, "  --multiple-thread          Generate files with multiple threads. This mean than generated files can be fragmented\n"+
+		"                             on disk. Can't be used with 'pseudo' generator")
 	fmt.Fprintln(f)
 
 	fmt.Fprintln(f, "Auxillary options:")
@@ -195,6 +204,7 @@ func ParseCmdOptions() *CmdOptions {
 	/* generator options */
 	genType := optparse.String("generator", 'g', "crypto")
 	seed := optparse.Uint("seed", 0, 0)
+	optparse.BoolVar(&Options.GenerateInMultipleThread, "multiple-thread", 0, false)
 
 	/* auxillary options */
 	help := optparse.Bool("help", 'h', false)

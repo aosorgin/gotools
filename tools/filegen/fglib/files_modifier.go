@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -109,8 +110,10 @@ type FilesModifier interface {
 }
 
 type modifyFilesWithIntervals struct {
-	gen         DataGenerator
-	path        string
+	gen                       DataGenerator
+	path                      string
+	generateInMultipleThreads bool
+
 	changeRatio float64
 
 	interval Interval
@@ -246,6 +249,12 @@ func (m *modifyFilesWithIntervals) Modify() error {
 	}
 
 	go func() {
+		if m.generateInMultipleThreads == false {
+			// Attach goroutine to the single thread to wrile files on disk with no fragmentation
+			runtime.LockOSThread()
+			defer runtime.UnlockOSThread()
+		}
+
 		err := filepath.Walk(m.path, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -303,14 +312,15 @@ func (m *modifyFilesWithIntervals) Modify() error {
 	}
 }
 
-func CreateFilesModifierWithInterval(gen DataGenerator, path string, changeRatio float64,
-	interval Interval, once, reverse bool) FilesModifier {
+func CreateFilesModifierWithInterval(gen DataGenerator, path string, generateInMultipleThreads bool,
+	changeRatio float64, interval Interval, once, reverse bool) FilesModifier {
 	return &modifyFilesWithIntervals{
-		gen:         gen,
-		path:        path,
-		changeRatio: changeRatio,
-		interval:    interval,
-		once:        once,
-		reverse:     reverse,
+		gen:  gen,
+		path: path,
+		generateInMultipleThreads: generateInMultipleThreads,
+		changeRatio:               changeRatio,
+		interval:                  interval,
+		once:                      once,
+		reverse:                   reverse,
 	}
 }

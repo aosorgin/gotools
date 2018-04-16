@@ -35,7 +35,7 @@ func generateFiles(options *fglib.CmdOptions) {
 	if err != nil {
 		log.Print(errors.Wrap(err, "Failed to initialize generator"))
 	}
-	filesGen := fglib.CreateLinearFileGenerator(gen, options.Path,
+	filesGen := fglib.CreateLinearFileGenerator(gen, options.Path, options.GenerateInMultipleThread,
 		options.Generate.Folders, fglib.CreatePrefixNameGenerator("dir_"),
 		options.Generate.Files, fglib.CreatePrefixNameGenerator("file_"), options.Generate.FileSize)
 
@@ -58,8 +58,8 @@ func changeFiles(options *fglib.CmdOptions) {
 		log.Print(errors.Wrap(err, "Failed to initialize generator"))
 	}
 
-	modifier := fglib.CreateFilesModifierWithInterval(gen, options.Path, options.Change.Ratio,
-		options.Change.Interval, options.Change.Once, options.Change.Reverse)
+	modifier := fglib.CreateFilesModifierWithInterval(gen, options.Path, options.GenerateInMultipleThread,
+		options.Change.Ratio, options.Change.Interval, options.Change.Once, options.Change.Reverse)
 
 	defer func() {
 		err = modifier.Close()
