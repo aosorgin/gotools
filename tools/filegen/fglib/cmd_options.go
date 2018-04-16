@@ -48,6 +48,7 @@ type CmdOptions struct {
 	}
 
 	GenerateInMultipleThread bool // If generate data in multiple threads all data could be placed on disk with fragmentation
+	QuietMode                bool // Used to remove showing of generation's progress
 }
 
 var Options CmdOptions
@@ -153,6 +154,7 @@ func usage(f io.Writer) {
 
 	fmt.Fprintln(f, "Common options:")
 	fmt.Fprintln(f, "  -p, --path                 Path to processing folder")
+	fmt.Fprintln(f, "  -q, --quiet                Quiet mode")
 	fmt.Fprintln(f)
 
 	fmt.Fprintln(f, "Generate command options:")
@@ -200,6 +202,7 @@ func ParseCmdOptions() *CmdOptions {
 
 	/* common options */
 	optparse.StringVar(&Options.Path, "path", 'p', "")
+	optparse.BoolVar(&Options.QuietMode, "quiet", 'q', false)
 
 	/* generator options */
 	genType := optparse.String("generator", 'g', "crypto")

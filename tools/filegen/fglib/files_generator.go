@@ -71,6 +71,7 @@ type linearFilesGenerator struct {
 	gen                       DataGenerator
 	path                      string
 	generateInMultipleThreads bool
+	printProgress             bool
 
 	dirsCount uint
 	dirNames  NameGenerator
@@ -125,7 +126,9 @@ func (g *linearFilesGenerator) Generate() error {
 	for {
 		select {
 		case <-timeout:
-			fmt.Printf("\rGenerated: (%d/%d)        ", filesGenerated, filesTotal)
+			if g.printProgress {
+				fmt.Printf("\rGenerated: (%d/%d)        ", filesGenerated, filesTotal)
+			}
 		case <-completeSignal:
 			fmt.Printf("\rGenerated: (%d/%d)        \n", filesGenerated, filesTotal)
 			return nil
@@ -137,11 +140,13 @@ func (g *linearFilesGenerator) Generate() error {
 
 func CreateLinearFileGenerator(gen DataGenerator, path string, generateInMultipleThreads bool,
 	dirsCount uint, dirNames NameGenerator,
-	filesCount uint, fileNames NameGenerator, fileSize uint64) FilesGenerator {
+	filesCount uint, fileNames NameGenerator, fileSize uint64,
+	quietMode bool) FilesGenerator {
 	return &linearFilesGenerator{
 		gen:  gen,
 		path: path,
 		generateInMultipleThreads: generateInMultipleThreads,
+		printProgress:             quietMode == false,
 		dirsCount:                 dirsCount,
 		dirNames:                  dirNames,
 		filesCount:                filesCount,

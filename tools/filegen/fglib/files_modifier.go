@@ -113,6 +113,7 @@ type modifyFilesWithIntervals struct {
 	gen                       DataGenerator
 	path                      string
 	generateInMultipleThreads bool
+	printProgress             bool
 
 	changeRatio float64
 
@@ -289,7 +290,9 @@ func (m *modifyFilesWithIntervals) Modify() error {
 
 	report := func() {
 		if totalFiles == 0 {
-			fmt.Printf("\rProcessed: %d        ", filesProcessed)
+			if m.printProgress {
+				fmt.Printf("\rProcessed: %d        ", filesProcessed)
+			}
 		} else {
 			fmt.Printf("\rProcessed: (%d/%d)        ", filesProcessed, totalFiles)
 		}
@@ -313,11 +316,12 @@ func (m *modifyFilesWithIntervals) Modify() error {
 }
 
 func CreateFilesModifierWithInterval(gen DataGenerator, path string, generateInMultipleThreads bool,
-	changeRatio float64, interval Interval, once, reverse bool) FilesModifier {
+	changeRatio float64, interval Interval, once, reverse bool, quietMode bool) FilesModifier {
 	return &modifyFilesWithIntervals{
 		gen:  gen,
 		path: path,
 		generateInMultipleThreads: generateInMultipleThreads,
+		printProgress:             quietMode == false,
 		changeRatio:               changeRatio,
 		interval:                  interval,
 		once:                      once,

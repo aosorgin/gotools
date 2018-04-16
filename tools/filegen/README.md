@@ -28,6 +28,7 @@ There are options for **generate** command:
 ```
 Common options:
   -p, --path                 Path to processing folder
+  -q, --quiet                Quiet mode
 
 Generate command options:
   -d, --dirs                 Directories count to generate
@@ -82,6 +83,7 @@ There are options for **change** command:
 ```
 Common options:
   -p, --path                 Path to processing folder
+  -q, --quiet                Quiet mode
 
 Change command options:
   --scale                    Percent of files cont to change. Range: [0;1]. By default is equal to 1

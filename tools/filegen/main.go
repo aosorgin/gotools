@@ -37,7 +37,8 @@ func generateFiles(options *fglib.CmdOptions) {
 	}
 	filesGen := fglib.CreateLinearFileGenerator(gen, options.Path, options.GenerateInMultipleThread,
 		options.Generate.Folders, fglib.CreatePrefixNameGenerator("dir_"),
-		options.Generate.Files, fglib.CreatePrefixNameGenerator("file_"), options.Generate.FileSize)
+		options.Generate.Files, fglib.CreatePrefixNameGenerator("file_"), options.Generate.FileSize,
+		options.QuietMode)
 
 	defer func() {
 		err = filesGen.Close()
@@ -59,7 +60,8 @@ func changeFiles(options *fglib.CmdOptions) {
 	}
 
 	modifier := fglib.CreateFilesModifierWithInterval(gen, options.Path, options.GenerateInMultipleThread,
-		options.Change.Ratio, options.Change.Interval, options.Change.Once, options.Change.Reverse)
+		options.Change.Ratio, options.Change.Interval, options.Change.Once, options.Change.Reverse,
+		options.QuietMode)
 
 	defer func() {
 		err = modifier.Close()
