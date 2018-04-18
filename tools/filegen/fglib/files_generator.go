@@ -20,30 +20,21 @@ import (
 	"github.com/pkg/errors"
 )
 
-func generateToFile(file *os.File, gen DataGenerator, size int64) (int64, error) {
+func generateToFileBuffer(file *os.File, gen DataGenerator, size int64, buffer []byte) (int64, error) {
 	bufFile := bufio.NewWriter(file)
 	defer bufFile.Flush()
 
-	writen, err := io.CopyN(bufFile, gen, size)
+	written, err := io.CopyBuffer(file, io.LimitReader(gen, size), buffer)
 	if err != nil {
-		return writen, errors.Wrap(err, "Failed to generate data to file")
+		return written, errors.Wrap(err, "Failed to generate data to file")
 	}
 
-	return writen, nil
-}
-
-func writeFile(path string, size uint64, gen DataGenerator) error {
-	rawFile, err := os.Create(path)
-	if err != nil {
-		return errors.Wrapf(err, "Failed for create '%s'", path)
-	}
-	defer rawFile.Close()
-
-	if _, err = generateToFile(rawFile, gen, int64(size)); err != nil {
-		return errors.Wrapf(err, "Failed to write to '%s'", path)
+	if written < size && err == nil {
+		// src stopped early; must have been EOF.
+		return written, io.EOF
 	}
 
-	return nil
+	return written, nil
 }
 
 type NameGenerator interface {
@@ -79,6 +70,8 @@ type linearFilesGenerator struct {
 	filesCount uint
 	fileNames  NameGenerator
 	fileSize   uint64
+
+	writeBuffer []byte
 }
 
 func (g *linearFilesGenerator) Close() error {
@@ -114,7 +107,7 @@ func (g *linearFilesGenerator) Generate() error {
 					errorChannel <- errors.Wrap(err, "Failed to generate file name")
 				}
 				filePath := filepath.Join(folderPath, fileName)
-				err = writeFile(filePath, g.fileSize, g.gen)
+				err = g.writeFile(filePath, g.fileSize)
 				if err != nil {
 					errorChannel <- errors.Wrapf(err, "Failed to generate file '%s'", filePath)
 				}
@@ -140,6 +133,24 @@ func (g *linearFilesGenerator) Generate() error {
 			return errors.Wrapf(err, "Failed to generate files")
 		}
 	}
+}
+
+func (g *linearFilesGenerator) writeFile(path string, size uint64) error {
+	rawFile, err := os.Create(path)
+	if err != nil {
+		return errors.Wrapf(err, "Failed for create '%s'", path)
+	}
+	defer rawFile.Close()
+
+	if g.writeBuffer == nil {
+		g.writeBuffer = make([]byte, 1024*1024)
+	}
+
+	if _, err = generateToFileBuffer(rawFile, g.gen, int64(size), g.writeBuffer); err != nil {
+		return errors.Wrapf(err, "Failed to write to '%s'", path)
+	}
+
+	return nil
 }
 
 func CreateLinearFileGenerator(gen DataGenerator, path string, generateInMultipleThreads bool,

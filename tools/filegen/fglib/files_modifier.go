@@ -122,17 +122,27 @@ type modifyFilesWithIntervals struct {
 	once     bool // use once if true otherwise until file ending
 	reverse  bool // use interval from the end of file if true
 	append   bool // use interval to append data to file
+
+	writeBuffer []byte
 }
 
 func (m *modifyFilesWithIntervals) Close() error {
 	return m.gen.Close()
 }
 
-func min(a int64, b int64) int64 {
-	if a <= b {
+func min(a, b int64) int64 {
+	if a < b {
 		return a
 	}
 	return b
+}
+
+func (m *modifyFilesWithIntervals) generateToFile(file *os.File, gen DataGenerator, size int64) (int64, error) {
+	if m.writeBuffer == nil {
+		m.writeBuffer = make([]byte, 1024*1024)
+	}
+
+	return generateToFileBuffer(file, gen, size, m.writeBuffer)
 }
 
 func (m *modifyFilesWithIntervals) appendFile(file *os.File, i *Interval) error {
@@ -141,7 +151,7 @@ func (m *modifyFilesWithIntervals) appendFile(file *os.File, i *Interval) error 
 		return errors.Wrap(err, "Failed to seek")
 	}
 
-	if _, err = generateToFile(file, m.gen, i.Modify.Value); err != nil {
+	if _, err = m.generateToFile(file, m.gen, i.Modify.Value); err != nil {
 		return errors.Wrap(err, "Failed to generate data to file")
 	}
 
@@ -212,7 +222,7 @@ func (m *modifyFilesWithIntervals) changeFile(path string, info os.FileInfo) err
 			writeSize = min(i.Modify.Value, size-newOffset)
 		}
 
-		writen, err := generateToFile(file, m.gen, writeSize)
+		writen, err := m.generateToFile(file, m.gen, writeSize)
 		newOffset += writen
 		offset = newOffset
 		if err != nil {
